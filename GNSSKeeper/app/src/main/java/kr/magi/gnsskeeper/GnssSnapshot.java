@@ -1,8 +1,14 @@
 package kr.magi.gnsskeeper;
 
 final class GnssSnapshot {
+    static final String MODE_NONE = "NONE";
+    static final String MODE_PASSIVE = "PASSIVE";
+    static final String MODE_ACTIVE = "ACTIVE";
+
     static volatile boolean running = false;
+    static volatile String mode = MODE_NONE;
     static volatile long lastLocationElapsedMs = 0L;
+    static volatile long lastGapMs = -1L;
     static volatile float accuracyM = Float.NaN;
     static volatile float speedMps = Float.NaN;
     static volatile float bearingDeg = Float.NaN;
