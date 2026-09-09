@@ -9,26 +9,36 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+/**
+ * v0.2(2026-09-09): 요청서 반영 - 모드별 로그파일 분리(PASSIVE_/ACTIVE_ 접두사),
+ * fix_age_ms·gap_from_prev_ms·mode 필드 추가. 기존 필드(altitude 등)는 유지
+ * (요청서 필드 목록에 없어도 삭제하지 않음 - 기존 분석 호환성).
+ */
 final class CsvLogger {
     private BufferedWriter locationWriter;
     private BufferedWriter statusWriter;
     private BufferedWriter measurementWriter;
     final File sessionDir;
+    private final String mode;
 
-    CsvLogger(Context context) throws IOException {
+    CsvLogger(Context context, String mode) throws IOException {
+        this.mode = mode;
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.KOREA).format(new Date());
         File base = context.getExternalFilesDir("gnss_logs");
         if (base == null) base = context.getFilesDir();
-        sessionDir = new File(base, stamp);
+        sessionDir = new File(base, mode + "_" + stamp);
         if (!sessionDir.exists() && !sessionDir.mkdirs()) {
             throw new IOException("Cannot create log directory: " + sessionDir);
         }
-        locationWriter = writer("location.csv",
-                "wall_time_ms,elapsed_realtime_nanos,latitude,longitude,accuracy_m,speed_mps,bearing_deg,altitude_m,provider\n");
-        statusWriter = writer("gnss_status.csv",
-                "wall_time_ms,visible,used_in_fix,l1_like,l5_like,max_cn0_dbhz,avg_cn0_dbhz\n");
-        measurementWriter = writer("gnss_measurements.csv",
-                "wall_time_ms,event_index,clock_discontinuity,measurement_count,l1_like,l5_like,avg_cn0_dbhz\n");
+        locationWriter = writer(mode + "_" + stamp + ".csv",
+                "wall_time_ms,elapsed_realtime_nanos,latitude,longitude,accuracy_m,speed_mps,bearing_deg," +
+                        "altitude_m,fix_age_ms,gap_from_prev_ms,mode,provider\n");
+        if (GnssSnapshot.MODE_ACTIVE.equals(mode)) {
+            statusWriter = writer("gnss_status.csv",
+                    "wall_time_ms,visible,used_in_fix,l1_like,l5_like,max_cn0_dbhz,avg_cn0_dbhz\n");
+            measurementWriter = writer("gnss_measurements.csv",
+                    "wall_time_ms,event_index,clock_discontinuity,measurement_count,l1_like,l5_like,avg_cn0_dbhz\n");
+        }
     }
 
     private BufferedWriter writer(String name, String header) throws IOException {
@@ -39,16 +49,19 @@ final class CsvLogger {
     }
 
     synchronized void logLocation(long wall, long elapsedNanos, double lat, double lon,
-                                  float accuracy, float speed, float bearing, double altitude, String provider) {
+                                  float accuracy, float speed, float bearing, double altitude,
+                                  long fixAgeMs, long gapFromPrevMs, String provider) {
         try {
             locationWriter.write(String.format(Locale.US,
-                    "%d,%d,%.8f,%.8f,%.2f,%.3f,%.2f,%.2f,%s\n",
-                    wall, elapsedNanos, lat, lon, accuracy, speed, bearing, altitude, safe(provider)));
+                    "%d,%d,%.8f,%.8f,%.2f,%.3f,%.2f,%.2f,%d,%d,%s,%s\n",
+                    wall, elapsedNanos, lat, lon, accuracy, speed, bearing, altitude,
+                    fixAgeMs, gapFromPrevMs, mode, safe(provider)));
             locationWriter.flush();
         } catch (IOException ignored) {}
     }
 
     synchronized void logStatus(long wall, int visible, int used, int l1, int l5, float maxCn0, float avgCn0) {
+        if (statusWriter == null) return;
         try {
             statusWriter.write(String.format(Locale.US,
                     "%d,%d,%d,%d,%d,%.2f,%.2f\n", wall, visible, used, l1, l5, maxCn0, avgCn0));
@@ -58,6 +71,7 @@ final class CsvLogger {
 
     synchronized void logMeasurement(long wall, long eventIdx, int discontinuity, int count,
                                      int l1, int l5, float avgCn0) {
+        if (measurementWriter == null) return;
         try {
             measurementWriter.write(String.format(Locale.US,
                     "%d,%d,%d,%d,%d,%d,%.2f\n",
