@@ -23,8 +23,18 @@ import androidx.annotation.Nullable;
 import java.io.IOException;
 import java.util.concurrent.Executor;
 
+/**
+ * v0.2(2026-09-09) — CASPER 작업요청 반영. PASSIVE 관찰모드 신설:
+ * Keeper 자체가 GPS_PROVIDER를 요청하지 않고, PASSIVE_PROVIDER로
+ * "다른 앱/시스템이 만든 위치 업데이트"만 수신한다. GnssStatus·
+ * GnssMeasurements 콜백은 그 등록 행위 자체가 GNSS 개입 소지가
+ * 있다고 판단해 PASSIVE 모드에서는 등록하지 않는다(요청서 "setFullTracking(true)
+ * 사용 금지" 원칙을 콜백 자체 미등록으로 안전하게 확장 적용).
+ * ACTIVE 모드는 기존 v0.1.0 로직을 그대로 보존한다.
+ */
 public final class GnssKeeperService extends Service {
-    public static final String ACTION_START = "kr.magi.gnsskeeper.START";
+    public static final String ACTION_START_ACTIVE = "kr.magi.gnsskeeper.START_ACTIVE";
+    public static final String ACTION_START_PASSIVE = "kr.magi.gnsskeeper.START_PASSIVE";
     public static final String ACTION_STOP = "kr.magi.gnsskeeper.STOP";
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "gnss_keeper";
@@ -32,6 +42,7 @@ public final class GnssKeeperService extends Service {
     private LocationManager locationManager;
     private Executor executor;
     private CsvLogger logger;
+    private long lastEventElapsedMs = -1L;
 
     private final LocationListener locationListener = this::onLocation;
 
@@ -91,48 +102,72 @@ public final class GnssKeeperService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        String action = intent == null ? ACTION_START : intent.getAction();
+        String action = intent == null ? ACTION_START_ACTIVE : intent.getAction();
         if (ACTION_STOP.equals(action)) {
             stopSelf();
             return START_NOT_STICKY;
         }
-        startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
-        startTracking();
+        String mode = ACTION_START_PASSIVE.equals(action) ? GnssSnapshot.MODE_PASSIVE : GnssSnapshot.MODE_ACTIVE;
+        startForeground(NOTIFICATION_ID, buildNotification(mode), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+        startTracking(mode);
         return START_NOT_STICKY;
     }
 
-    private void startTracking() {
+    private void startTracking(String mode) {
         if (GnssSnapshot.running) return;
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             stopSelf();
             return;
         }
         try {
-            logger = new CsvLogger(this);
+            logger = new CsvLogger(this, mode);
             GnssSnapshot.logDir = logger.sessionDir.getAbsolutePath();
         } catch (IOException e) {
             GnssSnapshot.logDir = "로그 생성 실패: " + e.getMessage();
         }
 
-        LocationRequest request = new LocationRequest.Builder(1000L)
-                .setMinUpdateIntervalMillis(500L)
-                .setMinUpdateDistanceMeters(0f)
-                .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY)
-                .build();
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, request, executor, locationListener);
-        locationManager.registerGnssStatusCallback(executor, statusCallback);
+        lastEventElapsedMs = -1L;
 
-        GnssMeasurementRequest measurementRequest = new GnssMeasurementRequest.Builder()
-                .setFullTracking(true)
-                .build();
-        locationManager.registerGnssMeasurementsCallback(measurementRequest, executor, measurementsCallback);
+        if (GnssSnapshot.MODE_PASSIVE.equals(mode)) {
+            // PASSIVE: Keeper 자체는 위치를 요청하지 않는다. 다른 앱/시스템이
+            // 이미 만든 위치만 수동적으로 수신한다. GnssStatus/Measurements도
+            // 등록하지 않는다(요청서 "setFullTracking(true) 사용 금지" 원칙).
+            LocationRequest passiveRequest = new LocationRequest.Builder(1000L)
+                    .setMinUpdateIntervalMillis(0L)
+                    .setMinUpdateDistanceMeters(0f)
+                    .build();
+            locationManager.requestLocationUpdates(
+                    LocationManager.PASSIVE_PROVIDER, passiveRequest, executor, locationListener);
+        } else {
+            // ACTIVE: 기존 v0.1.0 로직 그대로.
+            LocationRequest request = new LocationRequest.Builder(1000L)
+                    .setMinUpdateIntervalMillis(500L)
+                    .setMinUpdateDistanceMeters(0f)
+                    .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY)
+                    .build();
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, request, executor, locationListener);
+            locationManager.registerGnssStatusCallback(executor, statusCallback);
 
+            GnssMeasurementRequest measurementRequest = new GnssMeasurementRequest.Builder()
+                    .setFullTracking(true)
+                    .build();
+            locationManager.registerGnssMeasurementsCallback(measurementRequest, executor, measurementsCallback);
+        }
+
+        GnssSnapshot.mode = mode;
         GnssSnapshot.running = true;
         refreshNotification();
     }
 
     private void onLocation(Location location) {
-        GnssSnapshot.lastLocationElapsedMs = SystemClock.elapsedRealtime();
+        long nowElapsed = SystemClock.elapsedRealtime();
+        long gapMs = lastEventElapsedMs < 0 ? -1L : (nowElapsed - lastEventElapsedMs);
+        lastEventElapsedMs = nowElapsed;
+
+        long fixAgeMs = nowElapsed - (location.getElapsedRealtimeNanos() / 1_000_000L);
+
+        GnssSnapshot.lastLocationElapsedMs = nowElapsed;
+        GnssSnapshot.lastGapMs = gapMs;
         GnssSnapshot.accuracyM = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
         GnssSnapshot.speedMps = location.hasSpeed() ? location.getSpeed() : Float.NaN;
         GnssSnapshot.bearingDeg = location.hasBearing() ? location.getBearing() : Float.NaN;
@@ -143,19 +178,20 @@ public final class GnssKeeperService extends Service {
                     location.hasSpeed() ? location.getSpeed() : Float.NaN,
                     location.hasBearing() ? location.getBearing() : Float.NaN,
                     location.hasAltitude() ? location.getAltitude() : Double.NaN,
-                    location.getProvider());
+                    fixAgeMs, gapMs, location.getProvider());
         }
         refreshNotification();
     }
 
-    private Notification buildNotification() {
+    private Notification buildNotification(String mode) {
+        String modeLabel = GnssSnapshot.MODE_PASSIVE.equals(mode) ? "PASSIVE 관찰" : "ACTIVE 유지";
         String text;
         if (Float.isNaN(GnssSnapshot.accuracyM)) {
-            text = "고정밀 GNSS 위치 요청 중";
+            text = modeLabel + " · 위치 대기 중";
         } else {
             text = String.format(java.util.Locale.KOREA,
-                    "정확도 %.0fm · 사용위성 %d/%d",
-                    GnssSnapshot.accuracyM, GnssSnapshot.satellitesUsed, GnssSnapshot.satellitesVisible);
+                    "%s · 정확도 %.0fm · 사용위성 %d/%d",
+                    modeLabel, GnssSnapshot.accuracyM, GnssSnapshot.satellitesUsed, GnssSnapshot.satellitesVisible);
         }
         return new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
@@ -168,7 +204,7 @@ public final class GnssKeeperService extends Service {
 
     private void refreshNotification() {
         NotificationManager nm = getSystemService(NotificationManager.class);
-        if (nm != null && GnssSnapshot.running) nm.notify(NOTIFICATION_ID, buildNotification());
+        if (nm != null && GnssSnapshot.running) nm.notify(NOTIFICATION_ID, buildNotification(GnssSnapshot.mode));
     }
 
     private void createChannel() {
@@ -185,6 +221,7 @@ public final class GnssKeeperService extends Service {
         try { locationManager.unregisterGnssMeasurementsCallback(measurementsCallback); } catch (Exception ignored) {}
         if (logger != null) logger.close();
         GnssSnapshot.running = false;
+        GnssSnapshot.mode = GnssSnapshot.MODE_NONE;
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }
