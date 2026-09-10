@@ -1,8 +1,6 @@
 package kr.magi.gnsskeeper;
 
 import android.Manifest;
-import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -11,26 +9,29 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
-import android.view.animation.LinearInterpolator;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import java.util.Locale;
 
 /**
- * v0.2(2026-09-09) — 관찰만 시작(PASSIVE)/GNSS 유지 시작(ACTIVE)/중지
- * 3버튼 구조. 대표님 요청(2026-09-09) 반영: 실행 중일 때만 회전하고
- * 중지 시 그 자리에서 멈추는 레이더 스캐너 표시(순수 VectorDrawable+
- * ObjectAnimator, 외부 이미지/라이브러리 불필요).
+ * v0.2.3(2026-09-10) — 레이더 회전을 ObjectAnimator 대신 Handler로 직접
+ * 구동하도록 재작성. v0.2.1/0.2.2에서 ObjectAnimator(isStarted/isPaused
+ * 상태분기)가 실기기에서 회전을 보여주지 못하는 문제가 재현되어,
+ * 원인을 완전히 특정하기보다 훨씬 단순하고 실패 여지가 적은 방식으로
+ * 교체함 — 별도 60ms 틱마다 각도를 직접 계산해 imgRadar.setRotation()을
+ * 매번 명시적으로 호출한다. GnssSnapshot.running이 true일 때만 각도가
+ * 증가하고, false면 마지막 각도에서 그대로 멈춘다.
  */
 public final class MainActivity extends Activity {
     private static final int REQ_LOCATION = 10;
-    private static final long RADAR_ROTATION_MS = 2400L;
+    private static final long RADAR_TICK_MS = 60L;
+    private static final float RADAR_DEGREES_PER_TICK = 4.5f; // 60ms*80틱=4.8s/바퀴
 
     private TextView txtState;
     private TextView txtDetail;
     private ImageView imgRadar;
-    private ObjectAnimator radarAnimator;
+    private float radarAngle = 0f;
     private String pendingMode = GnssSnapshot.MODE_ACTIVE;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -38,6 +39,16 @@ public final class MainActivity extends Activity {
         @Override public void run() {
             render();
             handler.postDelayed(this, 1000L);
+        }
+    };
+
+    private final Runnable radarTick = new Runnable() {
+        @Override public void run() {
+            if (GnssSnapshot.running) {
+                radarAngle = (radarAngle + RADAR_DEGREES_PER_TICK) % 360f;
+                imgRadar.setRotation(radarAngle);
+            }
+            handler.postDelayed(this, RADAR_TICK_MS);
         }
     };
 
@@ -50,11 +61,6 @@ public final class MainActivity extends Activity {
         Button btnStartPassive = findViewById(R.id.btnStartPassive);
         Button btnStartActive = findViewById(R.id.btnStartActive);
         Button btnStop = findViewById(R.id.btnStop);
-
-        radarAnimator = ObjectAnimator.ofFloat(imgRadar, "rotation", 0f, 360f);
-        radarAnimator.setDuration(RADAR_ROTATION_MS);
-        radarAnimator.setRepeatCount(ValueAnimator.INFINITE);
-        radarAnimator.setInterpolator(new LinearInterpolator());
 
         btnStartPassive.setOnClickListener(v -> ensurePermissionAndStart(GnssSnapshot.MODE_PASSIVE));
         btnStartActive.setOnClickListener(v -> ensurePermissionAndStart(GnssSnapshot.MODE_ACTIVE));
@@ -105,31 +111,16 @@ public final class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         handler.post(refresh);
+        handler.post(radarTick);
     }
 
     @Override protected void onPause() {
         handler.removeCallbacks(refresh);
-        if (radarAnimator.isStarted()) radarAnimator.pause();
+        handler.removeCallbacks(radarTick);
         super.onPause();
     }
 
-    private void updateRadarAnimation() {
-        if (GnssSnapshot.running) {
-            if (!radarAnimator.isStarted()) {
-                radarAnimator.start();
-            } else if (radarAnimator.isPaused()) {
-                radarAnimator.resume();
-            }
-        } else {
-            if (radarAnimator.isStarted() && !radarAnimator.isPaused()) {
-                radarAnimator.pause();
-            }
-        }
-    }
-
     private void render() {
-        updateRadarAnimation();
-
         String stateLabel;
         if (!GnssSnapshot.running) {
             stateLabel = "상태: 중지";
