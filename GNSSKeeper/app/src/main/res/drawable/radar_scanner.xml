@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v0.2 부가기능: 관찰/유지 중 회전, 중지 시 정지하는 레이더 스캐너.
+     외부 이미지·라이브러리 없이 순수 VectorDrawable + 코드에서
+     ObjectAnimator로 회전 제어(MainActivity). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="220dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- 옅은 바깥 트랙 원 -->
+    <path
+        android:pathData="M 88,50 A 38,38 0 1,1 87.99,50 Z"
+        android:strokeColor="#334D6B73"
+        android:strokeWidth="1.2"
+        android:fillColor="#00000000" />
+
+    <!-- tick mark 8개 -->
+    <path android:pathData="M 82,49 L 84,49 L 84,51 L 82,51 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 72.3,72.3 L 74.3,72.3 L 74.3,74.3 L 72.3,74.3 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 49,82 L 51,82 L 51,84 L 49,84 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 25.7,72.3 L 27.7,72.3 L 27.7,74.3 L 25.7,74.3 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 16,49 L 18,49 L 18,51 L 16,51 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 25.7,25.7 L 27.7,25.7 L 27.7,27.7 L 25.7,27.7 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 49,16 L 51,16 L 51,18 L 49,18 Z" android:fillColor="#8ADBE4" />
+    <path android:pathData="M 72.3,25.7 L 74.3,25.7 L 74.3,27.7 L 72.3,27.7 Z" android:fillColor="#8ADBE4" />
+
+    <!-- 스캐너 꼬리(밝기 3단계, 회전방향으로 점점 밝아짐) -->
+    <path
+        android:pathData="M 88.00,50.00 A 38,38 0 0,1 74.43,79.11"
+        android:strokeColor="#2696A8B0"
+        android:strokeWidth="2.4"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M 74.43,79.11 A 38,38 0 0,1 59.84,86.71"
+        android:strokeColor="#60A9E8EF"
+        android:strokeWidth="2.4"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M 59.84,86.71 A 38,38 0 0,1 46.69,87.86"
+        android:strokeColor="#FFE8FBFD"
+        android:strokeWidth="2.6"
+        android:fillColor="#00000000" />
+
+    <!-- 안쪽 고정형 원 -->
+    <path
+        android:pathData="M 68,50 A 18,18 0 1,1 67.99,50 Z"
+        android:strokeColor="#664DD0E1"
+        android:strokeWidth="1"
+        android:fillColor="#00000000" />
+
+    <!-- 중앙 크로스헤어 -->
+    <path
+        android:pathData="M 42,50 L 46,50 M 54,50 L 58,50 M 50,42 L 50,46 M 50,54 L 50,58"
+        android:strokeColor="#B3E8FBFD"
+        android:strokeWidth="1" />
+
+    <!-- 중앙 포인터(삼각형) -->
+    <path
+        android:pathData="M 50,45 L 54,52 L 46,52 Z"
+        android:fillColor="#FFFFFF" />
+
+</vector>
