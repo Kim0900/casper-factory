@@ -1,6 +1,8 @@
 package kr.magi.gnsskeeper;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -9,19 +11,26 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.view.animation.LinearInterpolator;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import java.util.Locale;
 
 /**
  * v0.2(2026-09-09) — 관찰만 시작(PASSIVE)/GNSS 유지 시작(ACTIVE)/중지
- * 3버튼 구조로 확장. 어느 버튼을 눌렀는지에 따라 pendingMode를 저장해두고,
- * 권한이 이미 있으면 바로, 없으면 권한 승인 후 그 모드로 시작한다.
+ * 3버튼 구조. 대표님 요청(2026-09-09) 반영: 실행 중일 때만 회전하고
+ * 중지 시 그 자리에서 멈추는 레이더 스캐너 표시(순수 VectorDrawable+
+ * ObjectAnimator, 외부 이미지/라이브러리 불필요).
  */
 public final class MainActivity extends Activity {
     private static final int REQ_LOCATION = 10;
+    private static final long RADAR_ROTATION_MS = 2400L;
+
     private TextView txtState;
     private TextView txtDetail;
+    private ImageView imgRadar;
+    private ObjectAnimator radarAnimator;
     private String pendingMode = GnssSnapshot.MODE_ACTIVE;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -37,9 +46,15 @@ public final class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         txtState = findViewById(R.id.txtState);
         txtDetail = findViewById(R.id.txtDetail);
+        imgRadar = findViewById(R.id.imgRadar);
         Button btnStartPassive = findViewById(R.id.btnStartPassive);
         Button btnStartActive = findViewById(R.id.btnStartActive);
         Button btnStop = findViewById(R.id.btnStop);
+
+        radarAnimator = ObjectAnimator.ofFloat(imgRadar, "rotation", 0f, 360f);
+        radarAnimator.setDuration(RADAR_ROTATION_MS);
+        radarAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        radarAnimator.setInterpolator(new LinearInterpolator());
 
         btnStartPassive.setOnClickListener(v -> ensurePermissionAndStart(GnssSnapshot.MODE_PASSIVE));
         btnStartActive.setOnClickListener(v -> ensurePermissionAndStart(GnssSnapshot.MODE_ACTIVE));
@@ -94,10 +109,27 @@ public final class MainActivity extends Activity {
 
     @Override protected void onPause() {
         handler.removeCallbacks(refresh);
+        if (radarAnimator.isStarted()) radarAnimator.pause();
         super.onPause();
     }
 
+    private void updateRadarAnimation() {
+        if (GnssSnapshot.running) {
+            if (!radarAnimator.isStarted()) {
+                radarAnimator.start();
+            } else if (radarAnimator.isPaused()) {
+                radarAnimator.resume();
+            }
+        } else {
+            if (radarAnimator.isStarted() && !radarAnimator.isPaused()) {
+                radarAnimator.pause();
+            }
+        }
+    }
+
     private void render() {
+        updateRadarAnimation();
+
         String stateLabel;
         if (!GnssSnapshot.running) {
             stateLabel = "상태: 중지";
