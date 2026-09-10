@@ -27,6 +27,15 @@
             android:textColor="#E8E8E8"
             android:textSize="18sp" />
 
+        <ImageView
+            android:id="@+id/imgRadar"
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:layout_marginTop="20dp"
+            android:layout_gravity="center_horizontal"
+            android:src="@drawable/radar_scanner"
+            android:contentDescription="@null" />
+
         <TextView
             android:id="@+id/txtDetail"
             android:layout_width="match_parent"
