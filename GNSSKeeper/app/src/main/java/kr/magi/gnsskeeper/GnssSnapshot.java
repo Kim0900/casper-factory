@@ -8,6 +8,10 @@ final class GnssSnapshot {
     static volatile boolean running = false;
     static volatile String mode = MODE_NONE;
     static volatile long lastLocationElapsedMs = 0L;
+    static volatile long lastFixElapsedRealtimeNanos = 0L;
+    static volatile String lastError = "";
+    static volatile boolean statusRegistered = false;
+    static volatile boolean measurementsRegistered = false;
     static volatile long lastGapMs = -1L;
     static volatile float accuracyM = Float.NaN;
     static volatile float speedMps = Float.NaN;

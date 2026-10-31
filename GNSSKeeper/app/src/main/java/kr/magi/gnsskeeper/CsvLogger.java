@@ -48,7 +48,7 @@ final class CsvLogger {
         return w;
     }
 
-    synchronized void logLocation(long wall, long elapsedNanos, double lat, double lon,
+    synchronized boolean logLocation(long wall, long elapsedNanos, double lat, double lon,
                                   float accuracy, float speed, float bearing, double altitude,
                                   long fixAgeMs, long gapFromPrevMs, String provider) {
         try {
@@ -57,27 +57,39 @@ final class CsvLogger {
                     wall, elapsedNanos, lat, lon, accuracy, speed, bearing, altitude,
                     fixAgeMs, gapFromPrevMs, mode, safe(provider)));
             locationWriter.flush();
-        } catch (IOException ignored) {}
+            return true;
+        } catch (IOException e) {
+            GnssSnapshot.lastError = "위치 CSV 기록 실패";
+            return false;
+        }
     }
 
-    synchronized void logStatus(long wall, int visible, int used, int l1, int l5, float maxCn0, float avgCn0) {
-        if (statusWriter == null) return;
+    synchronized boolean logStatus(long wall, int visible, int used, int l1, int l5, float maxCn0, float avgCn0) {
+        if (statusWriter == null) return true;
         try {
             statusWriter.write(String.format(Locale.US,
                     "%d,%d,%d,%d,%d,%.2f,%.2f\n", wall, visible, used, l1, l5, maxCn0, avgCn0));
             statusWriter.flush();
-        } catch (IOException ignored) {}
+            return true;
+        } catch (IOException e) {
+            GnssSnapshot.lastError = "GNSS 상태 CSV 기록 실패";
+            return false;
+        }
     }
 
-    synchronized void logMeasurement(long wall, long eventIdx, int discontinuity, int count,
+    synchronized boolean logMeasurement(long wall, long eventIdx, int discontinuity, int count,
                                      int l1, int l5, float avgCn0) {
-        if (measurementWriter == null) return;
+        if (measurementWriter == null) return true;
         try {
             measurementWriter.write(String.format(Locale.US,
                     "%d,%d,%d,%d,%d,%d,%.2f\n",
                     wall, eventIdx, discontinuity, count, l1, l5, avgCn0));
             measurementWriter.flush();
-        } catch (IOException ignored) {}
+            return true;
+        } catch (IOException e) {
+            GnssSnapshot.lastError = "GNSS 측정 CSV 기록 실패";
+            return false;
+        }
     }
 
     synchronized void close() {

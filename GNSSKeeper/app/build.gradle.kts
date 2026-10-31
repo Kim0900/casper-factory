@@ -14,14 +14,7 @@ android {
         versionName = "0.2.4"
     }
 
-    signingConfigs {
-        getByName("debug") {
-            storeFile = file("../keystore/casper-factory-debug.keystore")
-            storePassword = "casperfactory123"
-            keyAlias = "casperfactory"
-            keyPassword = "casperfactory123"
-        }
-    }
+
 }
 
 dependencies {
