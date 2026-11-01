@@ -18,6 +18,7 @@ final class CsvLogger {
     private BufferedWriter locationWriter;
     private BufferedWriter statusWriter;
     private BufferedWriter measurementWriter;
+    private boolean closed;
     final File sessionDir;
     private final String mode;
 
@@ -48,39 +49,53 @@ final class CsvLogger {
         return w;
     }
 
-    synchronized void logLocation(long wall, long elapsedNanos, double lat, double lon,
+    synchronized boolean logLocation(long wall, long elapsedNanos, double lat, double lon,
                                   float accuracy, float speed, float bearing, double altitude,
                                   long fixAgeMs, long gapFromPrevMs, String provider) {
+        if (closed) return false;
         try {
             locationWriter.write(String.format(Locale.US,
                     "%d,%d,%.8f,%.8f,%.2f,%.3f,%.2f,%.2f,%d,%d,%s,%s\n",
                     wall, elapsedNanos, lat, lon, accuracy, speed, bearing, altitude,
                     fixAgeMs, gapFromPrevMs, mode, safe(provider)));
             locationWriter.flush();
-        } catch (IOException ignored) {}
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
-    synchronized void logStatus(long wall, int visible, int used, int l1, int l5, float maxCn0, float avgCn0) {
-        if (statusWriter == null) return;
+    synchronized boolean logStatus(long wall, int visible, int used, int l1, int l5, float maxCn0, float avgCn0) {
+        if (closed) return false;
+        if (statusWriter == null) return true;
         try {
             statusWriter.write(String.format(Locale.US,
                     "%d,%d,%d,%d,%d,%.2f,%.2f\n", wall, visible, used, l1, l5, maxCn0, avgCn0));
             statusWriter.flush();
-        } catch (IOException ignored) {}
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
-    synchronized void logMeasurement(long wall, long eventIdx, int discontinuity, int count,
+    synchronized boolean logMeasurement(long wall, long eventIdx, int discontinuity, int count,
                                      int l1, int l5, float avgCn0) {
-        if (measurementWriter == null) return;
+        if (closed) return false;
+        if (measurementWriter == null) return true;
         try {
             measurementWriter.write(String.format(Locale.US,
                     "%d,%d,%d,%d,%d,%d,%.2f\n",
                     wall, eventIdx, discontinuity, count, l1, l5, avgCn0));
             measurementWriter.flush();
-        } catch (IOException ignored) {}
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     synchronized void close() {
+        if (closed) return;
+        closed = true;
         try { if (locationWriter != null) locationWriter.close(); } catch (IOException ignored) {}
         try { if (statusWriter != null) statusWriter.close(); } catch (IOException ignored) {}
         try { if (measurementWriter != null) measurementWriter.close(); } catch (IOException ignored) {}

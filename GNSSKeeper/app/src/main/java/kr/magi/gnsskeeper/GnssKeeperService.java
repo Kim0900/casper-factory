@@ -17,6 +17,9 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationRequest;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Process;
 import android.os.IBinder;
 import android.os.SystemClock;
 import androidx.annotation.Nullable;
@@ -41,13 +44,28 @@ public final class GnssKeeperService extends Service {
 
     private LocationManager locationManager;
     private Executor executor;
-    private CsvLogger logger;
+    private HandlerThread callbackThread;
+    private long lastNotificationElapsedMs = -1L;
+    private volatile CsvLogger logger;
+    private volatile boolean stopping = true;
+    private volatile long sessionEpoch = 0L;
+    private final Object sessionLock = new Object();
     private long lastEventElapsedMs = -1L;
+    private LocationListener locationListener;
+    private GnssStatus.Callback statusCallback;
+    private GnssMeasurementsEvent.Callback measurementsCallback;
 
-    private final LocationListener locationListener = this::onLocation;
 
-    private final GnssStatus.Callback statusCallback = new GnssStatus.Callback() {
-        @Override public void onSatelliteStatusChanged(GnssStatus status) {
+    private boolean isActiveSession(long epoch, CsvLogger sessionLogger) {
+        return !stopping && epoch == sessionEpoch && sessionLogger != null
+                && logger == sessionLogger;
+    }
+
+    private void onStatus(GnssStatus status, long epoch) {
+        synchronized (sessionLock) {
+            // Snapshot the logger once: stopTracking() may invalidate the session.
+            CsvLogger sessionLogger = logger;
+            if (!isActiveSession(epoch, sessionLogger)) return;
             int visible = status.getSatelliteCount();
             int used = 0, l1 = 0, l5 = 0;
             float maxCn0 = 0f, sumCn0 = 0f;
@@ -62,18 +80,27 @@ public final class GnssKeeperService extends Service {
                     if (mhz >= 1150f && mhz <= 1250f) l5++;
                 }
             }
+            if (!isActiveSession(epoch, sessionLogger)) return;
             GnssSnapshot.satellitesVisible = visible;
             GnssSnapshot.satellitesUsed = used;
             GnssSnapshot.l1Count = l1;
             GnssSnapshot.l5Count = l5;
-            if (logger != null) logger.logStatus(System.currentTimeMillis(), visible, used, l1, l5,
-                    maxCn0, visible == 0 ? 0f : sumCn0 / visible);
+            if (!sessionLogger.logStatus(System.currentTimeMillis(), visible, used, l1, l5,
+                    maxCn0, visible == 0 ? 0f : sumCn0 / visible)) {
+                if (isActiveSession(epoch, sessionLogger)) {
+                    GnssSnapshot.lastError = "GNSS 상태 CSV 기록 실패";
+                    stopSelf();
+                }
+                return;
+            }
             refreshNotification();
         }
-    };
+    }
 
-    private final GnssMeasurementsEvent.Callback measurementsCallback = new GnssMeasurementsEvent.Callback() {
-        @Override public void onGnssMeasurementsReceived(GnssMeasurementsEvent event) {
+    private void onMeasurements(GnssMeasurementsEvent event, long epoch) {
+        synchronized (sessionLock) {
+            CsvLogger sessionLogger = logger;
+            if (!isActiveSession(epoch, sessionLogger)) return;
             long idx = ++GnssSnapshot.measurementEvents;
             GnssClock clock = event.getClock();
             int discontinuity = clock.getHardwareClockDiscontinuityCount();
@@ -89,15 +116,24 @@ public final class GnssKeeperService extends Service {
                     if (mhz >= 1150f && mhz <= 1250f) l5++;
                 }
             }
-            if (logger != null) logger.logMeasurement(System.currentTimeMillis(), idx, discontinuity,
-                    count, l1, l5, count == 0 ? 0f : sumCn0 / count);
+            if (!isActiveSession(epoch, sessionLogger)) return;
+            if (!sessionLogger.logMeasurement(System.currentTimeMillis(), idx, discontinuity,
+                    count, l1, l5, count == 0 ? 0f : sumCn0 / count)) {
+                if (isActiveSession(epoch, sessionLogger)) {
+                    GnssSnapshot.lastError = "GNSS 측정 CSV 기록 실패";
+                    stopSelf();
+                }
+            }
         }
-    };
+    }
 
     @Override public void onCreate() {
         super.onCreate();
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        executor = getMainExecutor();
+        callbackThread = new HandlerThread("GNSSKeeper-callbacks", Process.THREAD_PRIORITY_BACKGROUND);
+        callbackThread.start();
+        Handler callbackHandler = new Handler(callbackThread.getLooper());
+        executor = command -> callbackHandler.post(command);
         createChannel();
     }
 
@@ -114,79 +150,155 @@ public final class GnssKeeperService extends Service {
     }
 
     private void startTracking(String mode) {
-        if (GnssSnapshot.running) return;
+        if (GnssSnapshot.running) {
+            if (mode.equals(GnssSnapshot.mode)) return;
+            stopTracking(); // Switching modes must unregister the previous provider/callbacks.
+        }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            GnssSnapshot.lastError = "정확한 위치 권한 없음";
             stopSelf();
             return;
         }
+        GnssSnapshot.lastError = "";
+        GnssSnapshot.lastLocationElapsedMs = 0L;
+        GnssSnapshot.lastFixElapsedRealtimeNanos = 0L;
+        GnssSnapshot.lastGapMs = -1L;
+        GnssSnapshot.accuracyM = Float.NaN;
+        GnssSnapshot.speedMps = Float.NaN;
+        GnssSnapshot.bearingDeg = Float.NaN;
+        GnssSnapshot.satellitesVisible = 0;
+        GnssSnapshot.satellitesUsed = 0;
+        GnssSnapshot.l1Count = 0;
+        GnssSnapshot.l5Count = 0;
+        GnssSnapshot.measurementEvents = 0L;
+        GnssSnapshot.clockDiscontinuity = -1;
+        GnssSnapshot.statusRegistered = false;
+        GnssSnapshot.measurementsRegistered = false;
+        lastEventElapsedMs = -1L;
+        lastNotificationElapsedMs = -1L;
         try {
             logger = new CsvLogger(this, mode);
             GnssSnapshot.logDir = logger.sessionDir.getAbsolutePath();
         } catch (IOException e) {
-            GnssSnapshot.logDir = "로그 생성 실패: " + e.getMessage();
+            GnssSnapshot.logDir = "";
+            GnssSnapshot.lastError = "CSV 파일 생성 실패: " + e.getClass().getSimpleName();
+            stopSelf(); // This is a measurement app; running without evidence is not success.
+            return;
         }
-
-        lastEventElapsedMs = -1L;
-
-        if (GnssSnapshot.MODE_PASSIVE.equals(mode)) {
-            // PASSIVE: Keeper 자체는 위치를 요청하지 않는다. 다른 앱/시스템이
-            // 이미 만든 위치만 수동적으로 수신한다. GnssStatus/Measurements도
-            // 등록하지 않는다(요청서 "setFullTracking(true) 사용 금지" 원칙).
-            LocationRequest passiveRequest = new LocationRequest.Builder(1000L)
-                    .setMinUpdateIntervalMillis(0L)
-                    .setMinUpdateDistanceMeters(0f)
-                    .build();
-            locationManager.requestLocationUpdates(
-                    LocationManager.PASSIVE_PROVIDER, passiveRequest, executor, locationListener);
-        } else {
-            // ACTIVE: 기존 v0.1.0 로직 그대로.
-            LocationRequest request = new LocationRequest.Builder(1000L)
-                    .setMinUpdateIntervalMillis(500L)
-                    .setMinUpdateDistanceMeters(0f)
-                    .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY)
-                    .build();
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, request, executor, locationListener);
-            locationManager.registerGnssStatusCallback(executor, statusCallback);
-
-            GnssMeasurementRequest measurementRequest = new GnssMeasurementRequest.Builder()
-                    .setFullTracking(true)
-                    .build();
-            locationManager.registerGnssMeasurementsCallback(measurementRequest, executor, measurementsCallback);
+        final long epoch = ++sessionEpoch;
+        locationListener = location -> onLocation(location, epoch);
+        statusCallback = new GnssStatus.Callback() {
+            @Override public void onSatelliteStatusChanged(GnssStatus status) {
+                onStatus(status, epoch);
+            }
+        };
+        measurementsCallback = new GnssMeasurementsEvent.Callback() {
+            @Override public void onGnssMeasurementsReceived(GnssMeasurementsEvent event) {
+                onMeasurements(event, epoch);
+            }
+        };
+        stopping = false;
+        try {
+            if (GnssSnapshot.MODE_PASSIVE.equals(mode)) {
+                LocationRequest passiveRequest = new LocationRequest.Builder(1000L)
+                        .setMinUpdateIntervalMillis(0L).setMinUpdateDistanceMeters(0f).build();
+                locationManager.requestLocationUpdates(
+                        LocationManager.PASSIVE_PROVIDER, passiveRequest, executor, locationListener);
+            } else {
+                LocationRequest request = new LocationRequest.Builder(1000L)
+                        .setMinUpdateIntervalMillis(500L).setMinUpdateDistanceMeters(0f)
+                        .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER, request, executor, locationListener);
+                GnssSnapshot.statusRegistered =
+                        locationManager.registerGnssStatusCallback(executor, statusCallback);
+                GnssMeasurementRequest measurementRequest = new GnssMeasurementRequest.Builder()
+                        .setFullTracking(true).build();
+                GnssSnapshot.measurementsRegistered =
+                        locationManager.registerGnssMeasurementsCallback(
+                                measurementRequest, executor, measurementsCallback);
+                if (!GnssSnapshot.statusRegistered || !GnssSnapshot.measurementsRegistered) {
+                    GnssSnapshot.lastError = "일부 GNSS 계측 콜백 미등록 (위치는 기록 중)";
+                }
+            }
+            GnssSnapshot.mode = mode;
+            GnssSnapshot.running = true;
+            refreshNotification();
+        } catch (SecurityException | IllegalArgumentException | IllegalStateException e) {
+            GnssSnapshot.lastError = "위치 추적 시작 실패: " + e.getClass().getSimpleName();
+            stopTracking();
+            stopSelf();
         }
-
-        GnssSnapshot.mode = mode;
-        GnssSnapshot.running = true;
-        refreshNotification();
     }
 
-    private void onLocation(Location location) {
-        long nowElapsed = SystemClock.elapsedRealtime();
-        long gapMs = lastEventElapsedMs < 0 ? -1L : (nowElapsed - lastEventElapsedMs);
-        lastEventElapsedMs = nowElapsed;
+    private void stopTracking() {
+        // Invalidate the epoch before unregistering callbacks. Already queued
+        // callbacks belong to the old epoch and cannot write into the next session.
+        stopping = true;
+        ++sessionEpoch;
+        synchronized (sessionLock) {
+            LocationListener oldLocation = locationListener;
+            GnssStatus.Callback oldStatus = statusCallback;
+            GnssMeasurementsEvent.Callback oldMeasurements = measurementsCallback;
+            locationListener = null;
+            statusCallback = null;
+            measurementsCallback = null;
+            CsvLogger closedLogger = logger;
+            logger = null;
+            if (oldLocation != null) {
+                try { locationManager.removeUpdates(oldLocation); } catch (Exception ignored) {}
+            }
+            if (oldStatus != null) {
+                try { locationManager.unregisterGnssStatusCallback(oldStatus); } catch (Exception ignored) {}
+            }
+            if (oldMeasurements != null) {
+                try { locationManager.unregisterGnssMeasurementsCallback(oldMeasurements); } catch (Exception ignored) {}
+            }
+            if (closedLogger != null) closedLogger.close();
+            GnssSnapshot.running = false;
+            GnssSnapshot.mode = GnssSnapshot.MODE_NONE;
+            GnssSnapshot.statusRegistered = false;
+            GnssSnapshot.measurementsRegistered = false;
+        }
+    }
 
-        long fixAgeMs = nowElapsed - (location.getElapsedRealtimeNanos() / 1_000_000L);
-
-        GnssSnapshot.lastLocationElapsedMs = nowElapsed;
-        GnssSnapshot.lastGapMs = gapMs;
-        GnssSnapshot.accuracyM = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
-        GnssSnapshot.speedMps = location.hasSpeed() ? location.getSpeed() : Float.NaN;
-        GnssSnapshot.bearingDeg = location.hasBearing() ? location.getBearing() : Float.NaN;
-        if (logger != null) {
-            logger.logLocation(System.currentTimeMillis(), location.getElapsedRealtimeNanos(),
+    private void onLocation(Location location, long epoch) {
+        synchronized (sessionLock) {
+            CsvLogger sessionLogger = logger;
+            if (!isActiveSession(epoch, sessionLogger)) return;
+            long nowElapsed = SystemClock.elapsedRealtime();
+            long gapMs = lastEventElapsedMs < 0 ? -1L : (nowElapsed - lastEventElapsedMs);
+            lastEventElapsedMs = nowElapsed;
+            long fixAgeMs = nowElapsed - (location.getElapsedRealtimeNanos() / 1_000_000L);
+            GnssSnapshot.lastLocationElapsedMs = nowElapsed;
+            GnssSnapshot.lastFixElapsedRealtimeNanos = location.getElapsedRealtimeNanos();
+            GnssSnapshot.lastGapMs = gapMs;
+            GnssSnapshot.accuracyM = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
+            GnssSnapshot.speedMps = location.hasSpeed() ? location.getSpeed() : Float.NaN;
+            GnssSnapshot.bearingDeg = location.hasBearing() ? location.getBearing() : Float.NaN;
+            if (!sessionLogger.logLocation(System.currentTimeMillis(), location.getElapsedRealtimeNanos(),
                     location.getLatitude(), location.getLongitude(),
                     location.hasAccuracy() ? location.getAccuracy() : Float.NaN,
                     location.hasSpeed() ? location.getSpeed() : Float.NaN,
                     location.hasBearing() ? location.getBearing() : Float.NaN,
                     location.hasAltitude() ? location.getAltitude() : Double.NaN,
-                    fixAgeMs, gapMs, location.getProvider());
+                    fixAgeMs, gapMs, location.getProvider())) {
+                if (isActiveSession(epoch, sessionLogger)) {
+                    GnssSnapshot.lastError = "위치 CSV 기록 실패";
+                    stopSelf();
+                }
+                return;
+            }
+            refreshNotification();
         }
-        refreshNotification();
     }
 
     private Notification buildNotification(String mode) {
         String modeLabel = GnssSnapshot.MODE_PASSIVE.equals(mode) ? "PASSIVE 관찰" : "ACTIVE 유지";
         String text;
-        if (Float.isNaN(GnssSnapshot.accuracyM)) {
+        if (!GnssSnapshot.lastError.isEmpty()) {
+            text = modeLabel + " · " + GnssSnapshot.lastError;
+        } else if (Float.isNaN(GnssSnapshot.accuracyM)) {
             text = modeLabel + " · 위치 대기 중";
         } else {
             text = String.format(java.util.Locale.KOREA,
@@ -203,6 +315,9 @@ public final class GnssKeeperService extends Service {
     }
 
     private void refreshNotification() {
+        long now = SystemClock.elapsedRealtime();
+        if (lastNotificationElapsedMs >= 0L && now - lastNotificationElapsedMs < 1000L) return;
+        lastNotificationElapsedMs = now;
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (nm != null && GnssSnapshot.running) nm.notify(NOTIFICATION_ID, buildNotification(GnssSnapshot.mode));
     }
@@ -216,12 +331,8 @@ public final class GnssKeeperService extends Service {
     }
 
     @Override public void onDestroy() {
-        try { locationManager.removeUpdates(locationListener); } catch (Exception ignored) {}
-        try { locationManager.unregisterGnssStatusCallback(statusCallback); } catch (Exception ignored) {}
-        try { locationManager.unregisterGnssMeasurementsCallback(measurementsCallback); } catch (Exception ignored) {}
-        if (logger != null) logger.close();
-        GnssSnapshot.running = false;
-        GnssSnapshot.mode = GnssSnapshot.MODE_NONE;
+        stopTracking();
+        if (callbackThread != null) callbackThread.quitSafely();
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }

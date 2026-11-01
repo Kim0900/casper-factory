@@ -131,8 +131,9 @@ public final class MainActivity extends Activity {
         }
         txtState.setText(stateLabel);
 
-        long ageMs = GnssSnapshot.lastLocationElapsedMs == 0L
-                ? -1L : SystemClock.elapsedRealtime() - GnssSnapshot.lastLocationElapsedMs;
+        long fixNanos = GnssSnapshot.lastFixElapsedRealtimeNanos;
+        long ageMs = fixNanos == 0L ? -1L
+                : Math.max(0L, (SystemClock.elapsedRealtimeNanos() - fixNanos) / 1_000_000L);
         String acc = Float.isNaN(GnssSnapshot.accuracyM) ? "-" : String.format(Locale.KOREA, "%.1f m", GnssSnapshot.accuracyM);
         String speed = Float.isNaN(GnssSnapshot.speedMps) ? "-" : String.format(Locale.KOREA, "%.1f km/h", GnssSnapshot.speedMps * 3.6f);
         String age = ageMs < 0 ? "-" : String.format(Locale.KOREA, "%.1f s", ageMs / 1000f);
@@ -146,7 +147,10 @@ public final class MainActivity extends Activity {
                 "L1 유사 대역: " + GnssSnapshot.l1Count + "\n" +
                 "L5 유사 대역: " + GnssSnapshot.l5Count + "\n" +
                 "Raw measurement 이벤트: " + GnssSnapshot.measurementEvents + "\n" +
-                "HW clock discontinuity: " + GnssSnapshot.clockDiscontinuity + "\n\n" +
-                "로그 경로:\n" + (GnssSnapshot.logDir.isEmpty() ? "-" : GnssSnapshot.logDir));
+                "HW clock discontinuity: " + GnssSnapshot.clockDiscontinuity + "\n" +
+                "위성 상태 콜백: " + (GnssSnapshot.statusRegistered ? "정상" : "미등록") + "\n" +
+                "측정 콜백: " + (GnssSnapshot.measurementsRegistered ? "정상" : "미등록") + "\n" +
+                (GnssSnapshot.lastError.isEmpty() ? "" : "오류: " + GnssSnapshot.lastError + "\n") +
+                "\n로그 경로:\n" + (GnssSnapshot.logDir.isEmpty() ? "-" : GnssSnapshot.logDir));
     }
 }
