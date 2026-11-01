@@ -58,3 +58,21 @@ Android Studio에서 프로젝트 폴더를 열고 Gradle 동기화 후 `app`을
 - 주의: GNSS Keeper의 정상 동작은 카카오 T 배차 개선을 보장하지 않습니다.
 
 빌드 파이프라인은 Android SDK 명령 경로를 자동 탐색하며, 실제 APK의 컴파일 성공 및 실기기 작동은 별도 검증합니다.
+
+
+## 2026-11-01 MAGI 후속 수정 / 서명키·중지 경합
+- 고정 서명키: `GNSS_KEEPER_KEYSTORE_B64`, `GNSS_KEEPER_STORE_PASSWORD`,
+  `GNSS_KEEPER_KEY_ALIAS`, `GNSS_KEEPER_KEY_PASSWORD`의 4개 GitHub Actions
+  repository Secrets 필요. 저장소·PR·로그에 키·암호 포함 금지.
+- Secrets 미설정 상태는 Java 컴파일만 수행하며 설치 가능한 APK는 게시하지 않음.
+- Secrets가 모두 존재하면 GitHub Actions 실행기 임시 디렉터리로만 키를 복원,
+  debug 빌드에도 고정 서명 설정 사용, `apksigner verify` 후 아티팩트를 게시.
+- 첫 설치 전 기존 공개 디버그 키 APK와 서명 인증서가 다르므로 재설치가 필요할
+  수 있음. 설치앱 삭제 시 `getExternalFilesDir`의 로그도 삭제될 수 있으므로
+  반드시 로그를 먼저 백업. 새 전용 키는 향후 업데이트에서 계속 동일하게 유지.
+- **중지 경합:** 모든 GNSS 콜백은 등록 세션 epoch를 캡처하고 logger를 지역변수로
+  한 번 읽는다. 중지·모드 전환 시 epoch 무효화, 로거 close와 콜백을 동기화.
+  정상 중지 중 close된 로거에 의해 발생하는 거짓 CSV 오류는 보고하지 않는다.
+- **실기기 시험 필수:** `START_NOT_STICKY`가 서비스 재시작·전원관리·
+  앱 프로세스 종료·장시간 위치 유지 목적에 적합한지 별도 기록한다.
+- 컴파일과 APK 서명 검증은 S25+ 실기기 기능 검증 및 배차·수익 개선 검증이 아니다.

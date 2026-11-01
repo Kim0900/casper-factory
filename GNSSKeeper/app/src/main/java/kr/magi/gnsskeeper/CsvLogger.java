@@ -18,6 +18,7 @@ final class CsvLogger {
     private BufferedWriter locationWriter;
     private BufferedWriter statusWriter;
     private BufferedWriter measurementWriter;
+    private boolean closed;
     final File sessionDir;
     private final String mode;
 
@@ -51,6 +52,7 @@ final class CsvLogger {
     synchronized boolean logLocation(long wall, long elapsedNanos, double lat, double lon,
                                   float accuracy, float speed, float bearing, double altitude,
                                   long fixAgeMs, long gapFromPrevMs, String provider) {
+        if (closed) return false;
         try {
             locationWriter.write(String.format(Locale.US,
                     "%d,%d,%.8f,%.8f,%.2f,%.3f,%.2f,%.2f,%d,%d,%s,%s\n",
@@ -59,12 +61,12 @@ final class CsvLogger {
             locationWriter.flush();
             return true;
         } catch (IOException e) {
-            GnssSnapshot.lastError = "위치 CSV 기록 실패";
             return false;
         }
     }
 
     synchronized boolean logStatus(long wall, int visible, int used, int l1, int l5, float maxCn0, float avgCn0) {
+        if (closed) return false;
         if (statusWriter == null) return true;
         try {
             statusWriter.write(String.format(Locale.US,
@@ -72,13 +74,13 @@ final class CsvLogger {
             statusWriter.flush();
             return true;
         } catch (IOException e) {
-            GnssSnapshot.lastError = "GNSS 상태 CSV 기록 실패";
             return false;
         }
     }
 
     synchronized boolean logMeasurement(long wall, long eventIdx, int discontinuity, int count,
                                      int l1, int l5, float avgCn0) {
+        if (closed) return false;
         if (measurementWriter == null) return true;
         try {
             measurementWriter.write(String.format(Locale.US,
@@ -87,12 +89,13 @@ final class CsvLogger {
             measurementWriter.flush();
             return true;
         } catch (IOException e) {
-            GnssSnapshot.lastError = "GNSS 측정 CSV 기록 실패";
             return false;
         }
     }
 
     synchronized void close() {
+        if (closed) return;
+        closed = true;
         try { if (locationWriter != null) locationWriter.close(); } catch (IOException ignored) {}
         try { if (statusWriter != null) statusWriter.close(); } catch (IOException ignored) {}
         try { if (measurementWriter != null) measurementWriter.close(); } catch (IOException ignored) {}

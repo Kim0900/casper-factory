@@ -5,6 +5,7 @@ on:
     branches: [ main, 'fix/gnsskeeper-*' ]
     paths:
       - 'GNSSKeeper/**'
+      - '.github/workflows/build-gnsskeeper.yml'
   workflow_dispatch: {}
 
 jobs:
@@ -30,13 +31,63 @@ jobs:
           yes | "$SDKM" --licenses > /dev/null
           "$SDKM" --install 'platforms;android-36' 'build-tools;36.0.0'
 
-      - name: Build debug APK
-        working-directory: GNSSKeeper
-        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Detect all four dedicated signing secrets
+        id: signing
+        env:
+          KEEPER_B64: ${{ secrets.GNSS_KEEPER_KEYSTORE_B64 }}
+          KEEPER_STOREPASS: ${{ secrets.GNSS_KEEPER_STORE_PASSWORD }}
+          KEEPER_ALIAS: ${{ secrets.GNSS_KEEPER_KEY_ALIAS }}
+          KEEPER_KEYPASS: ${{ secrets.GNSS_KEEPER_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$KEEPER_B64" && -n "$KEEPER_STOREPASS" &&
+                -n "$KEEPER_ALIAS" && -n "$KEEPER_KEYPASS" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Dedicated signing secrets unavailable. Compilation only; installable APK is NOT published."
+          fi
 
-      - name: Upload APK artifact
+      - name: Restore private keystore on ephemeral runner
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          KEEPER_B64: ${{ secrets.GNSS_KEEPER_KEYSTORE_B64 }}
+          GNSS_KEEPER_STORE_PASSWORD: ${{ secrets.GNSS_KEEPER_STORE_PASSWORD }}
+          GNSS_KEEPER_KEY_ALIAS: ${{ secrets.GNSS_KEEPER_KEY_ALIAS }}
+          GNSS_KEEPER_KEY_PASSWORD: ${{ secrets.GNSS_KEEPER_KEY_PASSWORD }}
+        run: |
+          umask 077
+          SIGNING_FILE="$RUNNER_TEMP/gnsskeeper-private-signing.p12"
+          printf '%s' "$KEEPER_B64" | base64 --decode > "$SIGNING_FILE"
+          test -s "$SIGNING_FILE"
+          echo "GNSS_KEEPER_KEYSTORE_FILE=$SIGNING_FILE" >> "$GITHUB_ENV"
+          echo "GNSS_KEEPER_STORE_PASSWORD=$GNSS_KEEPER_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "GNSS_KEEPER_KEY_ALIAS=$GNSS_KEEPER_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "GNSS_KEEPER_KEY_PASSWORD=$GNSS_KEEPER_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Compile Android app (no signing secrets)
+        if: steps.signing.outputs.ready != 'true'
+        working-directory: GNSSKeeper
+        run: gradle :app:compileDebugJavaWithJavac --no-daemon --stacktrace
+
+      - name: Build consistently signed debug APK
+        if: steps.signing.outputs.ready == 'true'
+        working-directory: GNSSKeeper
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Verify signed APK
+        if: steps.signing.outputs.ready == 'true'
+        run: |
+          test -s GNSSKeeper/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify GNSSKeeper/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload ONLY dedicated-key signed APK
+        if: steps.signing.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: GNSSKeeper-debug-apk
-          path: GNSSKeeper/app/build/outputs/apk/debug/*.apk
+          name: GNSSKeeper-dedicated-key-signed-apk
+          path: GNSSKeeper/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Remove temporary signing keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gnsskeeper-private-signing.p12"
