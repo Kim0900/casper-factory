@@ -58,10 +58,33 @@ jobs:
           test -s "$SIGNING_FILE"
           echo "GNSS_KEEPER_KEYSTORE_FILE=$SIGNING_FILE" >> "$GITHUB_ENV"
 
-      - name: Compile Android app (no signing secrets)
+      - name: Assemble unsigned debug APK (no signing secrets)
         if: steps.signing.outputs.ready != 'true'
         working-directory: GNSSKeeper
-        run: gradle :app:compileDebugJavaWithJavac --no-daemon --stacktrace
+        run: |
+          gradle :app:assembleDebug --no-daemon --stacktrace
+          find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print
+          test -n "$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)"
+
+      - name: Package unsigned staging APK and Android signing tools
+        if: steps.signing.outputs.ready != 'true'
+        run: |
+          mkdir -p GNSSKeeper/staging-tools
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" GNSSKeeper/staging-tools/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" GNSSKeeper/staging-tools/zipalign
+          test -s GNSSKeeper/staging-tools/apksigner.jar
+          test -s GNSSKeeper/staging-tools/zipalign
+
+      - name: Upload unsigned staging ONLY (not installable)
+        if: steps.signing.outputs.ready != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GNSSKeeper-v026-unsigned-stage-and-signing-tools
+          path: |
+            GNSSKeeper/app/build/outputs/apk/debug/*.apk
+            GNSSKeeper/staging-tools/apksigner.jar
+            GNSSKeeper/staging-tools/zipalign
+          if-no-files-found: error
 
       - name: Build consistently signed debug APK
         if: steps.signing.outputs.ready == 'true'
