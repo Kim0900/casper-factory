@@ -51,18 +51,12 @@ jobs:
         if: steps.signing.outputs.ready == 'true'
         env:
           KEEPER_B64: ${{ secrets.GNSS_KEEPER_KEYSTORE_B64 }}
-          GNSS_KEEPER_STORE_PASSWORD: ${{ secrets.GNSS_KEEPER_STORE_PASSWORD }}
-          GNSS_KEEPER_KEY_ALIAS: ${{ secrets.GNSS_KEEPER_KEY_ALIAS }}
-          GNSS_KEEPER_KEY_PASSWORD: ${{ secrets.GNSS_KEEPER_KEY_PASSWORD }}
         run: |
           umask 077
           SIGNING_FILE="$RUNNER_TEMP/gnsskeeper-private-signing.p12"
           printf '%s' "$KEEPER_B64" | base64 --decode > "$SIGNING_FILE"
           test -s "$SIGNING_FILE"
           echo "GNSS_KEEPER_KEYSTORE_FILE=$SIGNING_FILE" >> "$GITHUB_ENV"
-          echo "GNSS_KEEPER_STORE_PASSWORD=$GNSS_KEEPER_STORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "GNSS_KEEPER_KEY_ALIAS=$GNSS_KEEPER_KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "GNSS_KEEPER_KEY_PASSWORD=$GNSS_KEEPER_KEY_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Compile Android app (no signing secrets)
         if: steps.signing.outputs.ready != 'true'
@@ -72,6 +66,10 @@ jobs:
       - name: Build consistently signed debug APK
         if: steps.signing.outputs.ready == 'true'
         working-directory: GNSSKeeper
+        env:
+          GNSS_KEEPER_STORE_PASSWORD: ${{ secrets.GNSS_KEEPER_STORE_PASSWORD }}
+          GNSS_KEEPER_KEY_ALIAS: ${{ secrets.GNSS_KEEPER_KEY_ALIAS }}
+          GNSS_KEEPER_KEY_PASSWORD: ${{ secrets.GNSS_KEEPER_KEY_PASSWORD }}
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Verify signed APK
