@@ -1,28 +1,21 @@
 package kr.magi.gnsskeeper;
 
+/** Screen/notification state: registrations and actually received data are separate. */
 final class GnssSnapshot {
-    static final String MODE_NONE = "NONE";
-    static final String MODE_PASSIVE = "PASSIVE";
-    static final String MODE_ACTIVE = "ACTIVE";
-
-    static volatile boolean running = false;
-    static volatile String mode = MODE_NONE;
-    static volatile long lastLocationElapsedMs = 0L;
-    static volatile long lastFixElapsedRealtimeNanos = 0L;
-    static volatile String lastError = "";
-    static volatile boolean statusRegistered = false;
-    static volatile boolean measurementsRegistered = false;
-    static volatile long lastGapMs = -1L;
-    static volatile float accuracyM = Float.NaN;
-    static volatile float speedMps = Float.NaN;
-    static volatile float bearingDeg = Float.NaN;
-    static volatile int satellitesVisible = 0;
-    static volatile int satellitesUsed = 0;
-    static volatile int l1Count = 0;
-    static volatile int l5Count = 0;
-    static volatile long measurementEvents = 0L;
-    static volatile int clockDiscontinuity = -1;
-    static volatile String logDir = "";
-
-    private GnssSnapshot() {}
+    static final String MODE_NONE = "NONE", MODE_PASSIVE = "PASSIVE", MODE_ACTIVE = "ACTIVE";
+    static final long STALE_AFTER_NANOS = 5_000_000_000L;
+    static volatile String phase = "STOPPED", mode = MODE_NONE, lastError = "", logDir = "", sourceProvider = "";
+    static volatile boolean running, observerRegistered, statusRegistered, measurementsRegistered;
+    static volatile long lastFixElapsedRealtimeNanos, lastObserverNanos, lastStatusNanos, lastMeasurementNanos;
+    static volatile long lastGapMs = -1, measurementEvents, observerSamples, droppedCallbacks;
+    static volatile float accuracyM = Float.NaN, speedMps = Float.NaN;
+    static volatile int satellitesVisible, satellitesUsed, l1Count, l5Count, clockDiscontinuity = -1;
+    static boolean fresh(long time, long now) { return time > 0 && now >= time && now - time <= STALE_AFTER_NANOS; }
+    static void resetMeasurements() {
+        lastFixElapsedRealtimeNanos = lastObserverNanos = lastStatusNanos = lastMeasurementNanos = 0;
+        lastGapMs = -1; measurementEvents = observerSamples = droppedCallbacks = 0;
+        accuracyM = speedMps = Float.NaN; sourceProvider = "";
+        satellitesVisible = satellitesUsed = l1Count = l5Count = 0; clockDiscontinuity = -1;
+        statusRegistered = measurementsRegistered = false;
+    }
 }

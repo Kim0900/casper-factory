@@ -71,11 +71,18 @@
             android:text="중지"
             android:textSize="16sp" />
 
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="앱 권한 설정" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
-            android:text="이 앱은 카카오 T 화면·버튼·네트워크·접근성 서비스에 접근하지 않습니다. PASSIVE 모드는 Keeper 자체가 위치를 요청하지 않고 다른 앱/시스템이 만든 위치 업데이트만 관찰합니다. ACTIVE 모드는 실제 Android GNSS 위치를 직접 요청하고 상태를 기록합니다."
+            android:text="이 앱은 카카오 T 화면·버튼·네트워크·접근성 서비스에 접근하지 않습니다. PASSIVE 모드는 Keeper 자체가 위치를 요청하지 않고 다른 앱/시스템이 만든 위치 업데이트만 관찰합니다. ACTIVE 모드는 별도 GPS 요청을 추가합니다. 두 모드의 주 기록은 같은 PASSIVE 관찰 경로를 사용합니다. 카카오콜 수신률 개선 효과는 확인되지 않았습니다."
             android:textColor="#8F949C"
             android:textSize="13sp" />
 
