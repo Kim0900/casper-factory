@@ -41,8 +41,10 @@ if __name__ == '__main__':
     r=copy.deepcopy(rules); r.find('device-transfer').remove(r.find('device-transfer/exclude')); fixtures.append(('missing_device_domain',manifest,r))
     r=copy.deepcopy(rules); ET.SubElement(r.find('cloud-backup'),'include',domain='external',path='gnss_logs'); fixtures.append(('reallowed_sensitive_path',manifest,r))
     r=copy.deepcopy(rules); r.find('cloud-backup/exclude').set('path','gnss_logs'); fixtures.append(('partial_root_exclusion',manifest,r))
+    m=copy.deepcopy(manifest); next(a for a in m.find('application').findall('activity') if a.get(A+'name','').endswith('LogExportActivity')).set(A+'exported','true'); fixtures.append(('export_activity_exposed',m,rules))
+    m=copy.deepcopy(manifest); ET.SubElement(m,'uses-permission',{A+'name':'android.permission.MANAGE_EXTERNAL_STORAGE'}); fixtures.append(('broad_storage_permission',m,rules))
     for name,m,r in fixtures:
         try: validate(m,r)
         except AssertionError: print('PASS reject',name)
         else: raise AssertionError('Unsafe fixture accepted: '+name)
-    print('PASS static policy; 6 defective fixtures rejected. Cloud/D2D runtime: NOT RUN.')
+    print('PASS static policy; 8 defective fixtures rejected. Cloud/D2D runtime: NOT RUN.')

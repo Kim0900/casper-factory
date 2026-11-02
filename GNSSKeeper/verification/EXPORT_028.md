@@ -17,7 +17,7 @@ Only selected direct session directories under getExternalFilesDir("gnss_logs") 
 
 The ZIP is not encrypted. The app tells the user that it contains location/time data before destination selection. The user's selected provider controls the exported copy's storage; automatic app cloud/D2D backup exclusions remain unchanged and do not apply to user-chosen exported copies. Retention/access/sharing decisions belong to the user. No backup exclusion is weakened.
 
-Private temporary ZIPs live only in cacheDir/log_exports, are removed after cancellation/save/failure/Activity exit, and stale spools are cleared on the next fresh export scan after process loss. Source logs are never removed. If the process or selected document provider fails during a save, an incomplete ZIP may remain at the user-selected destination. The app reports this without claiming success or deleting a potentially pre-existing provider document. A close/commit error or read-back mismatch fails the save.
+Private temporary ZIPs live only in cacheDir/log_exports, are removed on a best-effort basis after cancellation/save/failure/Activity exit, and stale spools are cleared on the next fresh export scan after process loss. Source logs are never removed. If the process or selected document provider fails during a save, an incomplete ZIP may remain at the user-selected destination. The app reports this without claiming success or deleting a potentially pre-existing provider document. A close/commit error or read-back mismatch fails the save.
 
 ## Lifecycle and threading
 

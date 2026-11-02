@@ -38,6 +38,8 @@ jobs:
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" GNSSKeeper/staging-tools/
           cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" GNSSKeeper/staging-tools/
           cp "$ANDROID_HOME/build-tools/36.0.0/aapt2" GNSSKeeper/staging-tools/
+          mkdir -p GNSSKeeper/staging-tools/lib64
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib64/libc++.so" GNSSKeeper/staging-tools/lib64/
           test -s GNSSKeeper/app/build/outputs/apk/release/app-release-unsigned.apk
       - uses: actions/upload-artifact@v4
         if: always()
