@@ -62,6 +62,7 @@ public final class MainActivity extends Activity {
     }
     private void requestStart(String mode) {
         if (permissionInFlight) return;
+        if ("STOPPING".equals(GnssSnapshot.phase)) { notice = "이전 세션 기록을 종료하고 있습니다. 완료 후 다시 시작하세요"; render(); return; }
         pendingMode = mode; notice = ""; notificationChecked = false;
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)) {
             pendingMode = null; notice = "GNSS를 지원하는 기기가 필요합니다"; render(); return;
