@@ -146,6 +146,7 @@ public final class MainActivity extends Activity {
                 .append("마지막 수신: ").append(age(GnssSnapshot.lastObserverNanos, now)).append("\n")
                 .append("위치 측정 시각: ").append(age(GnssSnapshot.lastFixElapsedRealtimeNanos, now)).append("\n")
                 .append("추정 정확도: ").append(freshFix && !Float.isNaN(GnssSnapshot.accuracyM) ? String.format(Locale.KOREA, "%.1f m", GnssSnapshot.accuracyM) : "N/A (미수신 또는 오래된 자료)").append("\n")
+                .append("속도: ").append(freshFix && !Float.isNaN(GnssSnapshot.speedMps) ? String.format(Locale.KOREA, "%.1f km/h", GnssSnapshot.speedMps * 3.6f) : "N/A").append("\n")
                 .append("수신 간격: ").append(GnssSnapshot.lastGapMs < 0 ? "N/A" : GnssSnapshot.lastGapMs + " ms").append("\n")
                 .append("공통 관찰 표본: ").append(GnssSnapshot.observerSamples).append("\n\n")
                 .append("ACTIVE 진단 · 위성 상태: ").append(GnssSnapshot.statusRegistered ? "등록됨" : "미등록").append("\n")
@@ -155,6 +156,7 @@ public final class MainActivity extends Activity {
                 .append("Raw 콜백: ").append(GnssSnapshot.measurementsRegistered ? "등록됨" : "미등록").append(" · ")
                 .append(freshRaw ? "수신 중" : "N/A (미수신/오래됨)").append("\n")
                 .append("Raw 수신: ").append(age(GnssSnapshot.lastMeasurementNanos, now)).append(" · 누적 ").append(GnssSnapshot.measurementEvents).append("회\n\n")
+                .append("Clock discontinuity: ").append(freshRaw ? Integer.toString(GnssSnapshot.clockDiscontinuity) : "N/A").append("\n\n")
                 .append("신선도 표시 기준: 5초. PASSIVE 무수신 시 ACTIVE로 자동 전환하지 않습니다.\n")
                 .append("신호 항목 수는 고유 위성 수가 아니며, 추정 정확도는 실제 오차 측정값이 아닙니다.\n")
                 .append("기록 경로: ").append(GnssSnapshot.logDir.isEmpty() ? "아직 없음" : GnssSnapshot.logDir);

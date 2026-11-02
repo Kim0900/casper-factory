@@ -54,7 +54,7 @@ final class CsvLogger implements Closeable {
             observer = open(factory, "observer_passive.csv", "wall_time_ms,fix_elapsed_nanos,received_elapsed_nanos,sequence,experiment_id,session_id,condition_epoch,mode,observer_provider,source_provider,latitude,longitude,accuracy_m,speed_mps,bearing_deg,altitude_m,fix_age_ms,gap_from_prev_ms,within_condition,duplicate_fix,is_mock");
             if ("ACTIVE".equals(mode)) direct = open(factory, "diagnostic_gps.csv", "wall_time_ms,fix_elapsed_nanos,received_elapsed_nanos,source_provider,accuracy_m,fix_age_ms");
             status = open(factory, "gnss_status.csv", "wall_time_ms,received_elapsed_nanos,signal_entries,used_entries,l1_like_entries,l5_like_entries,max_cn0_dbhz,avg_cn0_dbhz");
-            measurements = open(factory, "gnss_measurements.csv", "wall_time_ms,received_elapsed_nanos,event_index,clock_discontinuity,measurement_count,avg_cn0_dbhz");
+            measurements = open(factory, "gnss_measurements.csv", "wall_time_ms,received_elapsed_nanos,event_index,clock_discontinuity,measurement_count,l1_like_entries,l5_like_entries,avg_cn0_dbhz");
             events = open(factory, "events.csv", "wall_time_ms,elapsed_nanos,event,detail");
             event(System.currentTimeMillis(), startNanos, "START", mode);
             writeMetadata(0, "OPEN", "");
@@ -92,8 +92,8 @@ final class CsvLogger implements Closeable {
     void logStatus(long wall, long receipt, int visible, int used, int l1, int l5, float max, float avg) throws IOException {
         row(status, wall + "," + receipt + "," + visible + "," + used + "," + l1 + "," + l5 + "," + max + "," + avg);
     }
-    void logMeasurement(long wall, long receipt, long idx, int discontinuity, int count, float avg) throws IOException {
-        row(measurements, wall + "," + receipt + "," + idx + "," + discontinuity + "," + count + "," + avg);
+    void logMeasurement(long wall, long receipt, long idx, int discontinuity, int count, int l1, int l5, float avg) throws IOException {
+        row(measurements, wall + "," + receipt + "," + idx + "," + discontinuity + "," + count + "," + l1 + "," + l5 + "," + avg);
     }
     void event(long wall, long elapsed, String event, String detail) throws IOException {
         row(events, wall + "," + elapsed + "," + cell(event) + "," + cell(detail));

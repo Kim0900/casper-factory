@@ -249,12 +249,19 @@ public final class GnssKeeperService extends Service {
     }
     private void onMeasurements(GnssMeasurementsEvent event) {
         final long e = activeEpoch;
-        int count = 0; float sum = 0;
-        for (GnssMeasurement m : event.getMeasurements()) { count++; sum += m.getCn0DbHz(); }
+        int count = 0, l1 = 0, l5 = 0; float sum = 0;
+        for (GnssMeasurement m : event.getMeasurements()) {
+            count++; sum += m.getCn0DbHz();
+            if (m.hasCarrierFrequencyHz()) {
+                float mhz = m.getCarrierFrequencyHz() / 1_000_000f;
+                if (mhz >= 1550 && mhz <= 1610) l1++;
+                if (mhz >= 1150 && mhz <= 1250) l5++;
+            }
+        }
         int discontinuity = event.getClock().getHardwareClockDiscontinuityCount();
         try {
             logger.logMeasurement(System.currentTimeMillis(), received(), GnssSnapshot.measurementEvents + 1,
-                    discontinuity, count, count == 0 ? 0 : sum / count);
+                    discontinuity, count, l1, l5, count == 0 ? 0 : sum / count);
             if (!valid(e)) return;
             GnssSnapshot.lastMeasurementNanos = received(); GnssSnapshot.measurementEvents++;
             GnssSnapshot.clockDiscontinuity = discontinuity;
