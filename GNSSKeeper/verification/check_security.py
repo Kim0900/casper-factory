@@ -26,6 +26,9 @@ def validate(manifest, rules):
     assert {'android.permission.ACCESS_FINE_LOCATION','android.permission.ACCESS_COARSE_LOCATION'} <= perms
     assert app.find('service').get(A+'exported') == 'false'
     assert not app.findall('provider')
+    export = [a for a in app.findall('activity') if a.get(A+'name','').endswith('LogExportActivity')]
+    assert len(export) == 1 and export[0].get(A+'exported') == 'false'
+    assert not any('STORAGE' in p or 'MANAGE_EXTERNAL' in p for p in perms)
 
 if __name__ == '__main__':
     manifest = ET.parse(ROOT / 'AndroidManifest.xml').getroot()

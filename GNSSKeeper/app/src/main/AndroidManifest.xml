@@ -23,6 +23,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".LogExportActivity" android:exported="false" />
+
         <service
             android:name=".GnssKeeperService"
             android:exported="false"

@@ -72,6 +72,13 @@
             android:textSize="16sp" />
 
         <Button
+            android:id="@+id/btnExport"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="로그 내보내기" />
+
+        <Button
             android:id="@+id/btnSettings"
             android:layout_width="match_parent"
             android:layout_height="56dp"

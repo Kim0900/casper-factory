@@ -20,11 +20,12 @@ android {
         applicationId = "kr.magi.gnsskeeper"
         minSdk = 31
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.2.7"
+        versionCode = 10
+        versionName = "0.2.8"
     }
 
     buildFeatures { buildConfig = true }
+    testOptions { unitTests.isIncludeAndroidResources = true }
 
     signingConfigs {
         if (hasDedicatedSigner) {
@@ -56,4 +57,5 @@ android {
 dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
 }

@@ -49,6 +49,7 @@ public final class MainActivity extends Activity {
             catch (SecurityException | IllegalStateException ex) { notice = "중지 요청 실패: 앱을 다시 열어 확인하세요"; }
             render();
         });
+        findViewById(R.id.btnExport).setOnClickListener(v -> startActivity(new Intent(this, LogExportActivity.class)));
         findViewById(R.id.btnSettings).setOnClickListener(v -> {
             pendingMode = null;
             try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); }

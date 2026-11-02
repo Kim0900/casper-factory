@@ -1,4 +1,4 @@
-# GNSS Keeper v0.2.7
+# GNSS Keeper v0.2.8
 
 Android 12 이상에서 위치 전달을 관찰하고, 사용자가 선택하면 GNSS 유지 요청을 추가하는 기록 앱입니다. 카카오콜 수신률 향상 효과는 확인되지 않았습니다.
 
@@ -19,7 +19,7 @@ Android 12 이상에서 위치 전달을 관찰하고, 사용자가 선택하면
 | gnss_status.csv / gnss_measurements.csv | ACTIVE GNSS 진단. PASSIVE에서는 측정하지 않음 |
 | events.csv / session.json | 시작·종료·구독 이벤트, 세션/조건 식별자와 단조 시각. OPEN/END 누락은 불완전 기록 |
 
-원본은 앱 전용 `Android/data/kr.magi.gnsskeeper/files/gnss_logs/`에 저장하며 외부 저장소가 없으면 내부 filesDir로 대체합니다. 자동 클라우드 백업·D2D에서 앱 데이터를 제외하도록 명시했습니다. 실제 제조사 이전 도구의 정책 집행은 별도 Galaxy 검증이 필요합니다. 앱 전용 저장소는 암호화 기능 자체를 뜻하지 않습니다. 새 로그 내보내기 기능은 이번 범위에 추가하지 않았습니다.
+원본은 앱 전용 `Android/data/kr.magi.gnsskeeper/files/gnss_logs/`에 저장하며 외부 저장소가 없으면 내부 filesDir로 대체합니다. 자동 클라우드 백업·D2D에서 앱 데이터를 제외하도록 명시했습니다. 실제 제조사 이전 도구의 정책 집행은 별도 Galaxy 검증이 필요합니다. 앱 전용 저장소는 암호화 기능 자체를 뜻하지 않습니다. 기록을 중지한 후 **로그 내보내기 → 세션 선택(또는 전체 선택) → 선택한 기록 내보내기**를 누르면 Android 저장 창에서 ZIP 저장 위치를 지정할 수 있습니다. 저장한 ZIP을 선택한 폴더에서 찾아 첨부하면 됩니다. 원본 로그는 유지되며 ZIP에는 파일별 SHA256과 세션 정보가 포함됩니다. ZIP 자체는 암호화되지 않으므로 저장 위치와 공유 대상을 확인하세요. [내보내기 규격·시험](verification/EXPORT_028.md)을 참고하세요.
 
 신선도는 5초 기준으로 표시합니다. 콜백 등록과 실제 수신은 구분되며 오래된 위치·위성·Raw 값은 N/A입니다. 대역 항목 수는 고유 위성 수나 정확한 GPS L5 위성 수가 아닙니다.
 
@@ -31,13 +31,13 @@ OS 추정 정확도는 실제 절대오차가 아니며 이 관찰 좌표를 카
 
 ## 빌드와 검증
 
-compile/target SDK36, minSDK31, AGP9.4.0, Gradle9.6.0, JDK17.
+compile/target SDK36, minSDK31, AGP9.4.0, Gradle9.6.0, JDK21(테스트 포함).
 
 ```
 python3 verification/check_security.py
 gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --no-daemon
 ```
 
-CI는 비디버그 릴리스 미서명 APK와 시험 증거를 만들며 설치 파일은 기존 전용키로 서명한 후 제공합니다. 패키지는 `kr.magi.gnsskeeper`, versionCode는 9입니다. v0.2.6 기준 인증서 SHA256은 `0bd45bc4ab9f0795c1f960cd40334b8fa02e5bd7eebc7ee1066add68e816c251`이며 반드시 일치해야 합니다. 키·암호·실제 이동 기록을 저장소나 CI에 올리지 않습니다.
+CI는 비디버그 릴리스 미서명 APK와 시험 증거를 만들며 설치 파일은 기존 전용키로 서명한 후 제공합니다. 패키지는 `kr.magi.gnsskeeper`, versionCode는 10입니다. v0.2.6 기준 인증서 SHA256은 `0bd45bc4ab9f0795c1f960cd40334b8fa02e5bd7eebc7ee1066add68e816c251`이며 반드시 일치해야 합니다. 키·암호·실제 이동 기록을 저장소나 CI에 올리지 않습니다.
 
 v0.2.6과의 실제 업데이트/로그 보존, 권한·잠금·장시간 동작, 실제 클라우드 복원 및 Galaxy D2D, 다른 검증자의 독립 재현은 별도 완료 증거가 필요합니다. 인증서 불일치를 해결하기 위해 기존 앱을 자동 삭제하거나 로그를 지우지 않습니다. 과거 S19 19건과 SR05 4건은 수정 전 원본 증거로 별도 보존합니다.
