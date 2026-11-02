@@ -35,7 +35,7 @@ public final class RepairRegressionTest {
             l.finish(4_000_000_000L, "TEST_END");
             List<String> lines = Files.readAllLines(new File(l.sessionDir, "observer_passive.csv").toPath());
             assertEquals(2, lines.size());
-            String meta = Files.readString(new File(l.sessionDir, "session.json").toPath());
+            String meta = new String(Files.readAllBytes(new File(l.sessionDir, "session.json").toPath()), java.nio.charset.StandardCharsets.UTF_8);
             assertTrue(meta.contains("CLOSED")); assertTrue(meta.contains(l.sessionId));
         }
         assertEquals(100, base.listFiles().length);
@@ -106,7 +106,7 @@ public final class RepairRegressionTest {
         });
         try { l.finish(3, "END"); fail("Close failure must surface"); } catch (IOException expected) { }
         for (TrackingWriter w : opened) assertTrue(w.closed);
-        assertTrue(Files.readString(new File(l.sessionDir, "session.json").toPath()).contains("INCOMPLETE"));
+        assertTrue(new String(Files.readAllBytes(new File(l.sessionDir, "session.json").toPath()), java.nio.charset.StandardCharsets.UTF_8).contains("INCOMPLETE"));
     }
     @Test public void writingClosedSessionFailsInsteadOfReportingSuccess() throws Exception {
         CsvLogger l = logger(root(), "PASSIVE", 1); l.close();

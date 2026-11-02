@@ -31,7 +31,7 @@ jobs:
         run: python3 GNSSKeeper/verification/check_security.py
       - name: Release unit tests, lint and unsigned assembly
         working-directory: GNSSKeeper
-        run: gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --no-daemon --stacktrace
+        run: gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --no-daemon --stacktrace --continue
       - name: Stage APK and verification tools
         run: |
           mkdir -p GNSSKeeper/staging-tools
