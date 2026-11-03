@@ -27,6 +27,53 @@
             android:textColor="#E8E8E8"
             android:textSize="18sp" />
 
+        <TextView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:text="상태 대시보드"
+            android:textColor="#FFFFFF" android:textSize="20sp" android:textStyle="bold" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:orientation="horizontal" android:baselineAligned="false">
+            <TextView android:id="@+id/cardThermal" android:layout_width="0dp"
+                android:layout_height="match_parent" android:layout_weight="1" android:minHeight="116dp"
+                android:layout_marginEnd="5dp" android:padding="12dp"
+                android:text="확인 중" android:textColor="#B0BEC5" android:textSize="14sp"
+                android:lineSpacingExtra="4dp" android:accessibilityLiveRegion="none" />
+            <TextView android:id="@+id/cardLocation" android:layout_width="0dp"
+                android:layout_height="match_parent" android:layout_weight="1" android:minHeight="116dp"
+                android:layout_marginStart="5dp" android:padding="12dp"
+                android:text="확인 중" android:textColor="#B0BEC5" android:textSize="14sp"
+                android:lineSpacingExtra="4dp" android:accessibilityLiveRegion="none" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:orientation="horizontal" android:baselineAligned="false">
+            <TextView android:id="@+id/cardService" android:layout_width="0dp"
+                android:layout_height="match_parent" android:layout_weight="1" android:minHeight="116dp"
+                android:layout_marginEnd="5dp" android:padding="12dp"
+                android:text="확인 중" android:textColor="#B0BEC5" android:textSize="14sp"
+                android:lineSpacingExtra="4dp" android:accessibilityLiveRegion="none" />
+            <TextView android:id="@+id/cardNetwork" android:layout_width="0dp"
+                android:layout_height="match_parent" android:layout_weight="1" android:minHeight="116dp"
+                android:layout_marginStart="5dp" android:padding="12dp"
+                android:text="확인 중" android:textColor="#B0BEC5" android:textSize="14sp"
+                android:lineSpacingExtra="4dp" android:accessibilityLiveRegion="none" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:orientation="horizontal" android:baselineAligned="false">
+            <TextView android:id="@+id/cardPower" android:layout_width="0dp"
+                android:layout_height="match_parent" android:layout_weight="1" android:minHeight="116dp"
+                android:layout_marginEnd="5dp" android:padding="12dp"
+                android:text="확인 중" android:textColor="#B0BEC5" android:textSize="14sp"
+                android:lineSpacingExtra="4dp" android:accessibilityLiveRegion="none" />
+            <TextView android:id="@+id/cardPermission" android:layout_width="0dp"
+                android:layout_height="match_parent" android:layout_weight="1" android:minHeight="116dp"
+                android:layout_marginStart="5dp" android:padding="12dp"
+                android:text="확인 중" android:textColor="#B0BEC5" android:textSize="14sp"
+                android:lineSpacingExtra="4dp" android:accessibilityLiveRegion="none" />
+        </LinearLayout>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:textColor="#BFC3CA" android:textSize="13sp"
+            android:text="발열: 파랑 제한 없음 → 녹색 경미 → 노랑 주의 → 빨강 심함·긴급. 회색은 미확인/중지입니다. 열 상태는 배터리 온도와 다른 OS 판정입니다. 위치 색상은 측정 시각의 경과 시간이며 실제 오차·카카오콜 수신률 판정이 아닙니다. PASSIVE 무수신은 관찰 대기로 표시합니다." />
+
         <ImageView
             android:id="@+id/imgRadar"
             android:layout_width="220dp"

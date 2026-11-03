@@ -126,6 +126,7 @@ public final class MainActivity extends Activity {
     private static String age(long timestamp, long now) { return timestamp <= 0 ? "수신 없음" : String.format(Locale.KOREA, "%.1f초 전", Math.max(0, now - timestamp) / 1e9); }
     private void render() {
         long now = SystemClock.elapsedRealtimeNanos();
+        DeviceDashboard.render(this, now);
         boolean active = GnssSnapshot.MODE_ACTIVE.equals(GnssSnapshot.mode);
         boolean freshFix = GnssSnapshot.running && GnssSnapshot.fresh(GnssSnapshot.lastFixElapsedRealtimeNanos, now);
         boolean freshStatus = GnssSnapshot.running && active && GnssSnapshot.fresh(GnssSnapshot.lastStatusNanos, now);
