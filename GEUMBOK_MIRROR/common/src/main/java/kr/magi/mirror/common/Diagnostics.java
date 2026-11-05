@@ -32,8 +32,10 @@ public final class Diagnostics {
             int scale = battery == null ? -1 : battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
             int temperature = battery == null ? -1 : battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1);
             int plugged = battery == null ? -1 : battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
+            long cpuMillis = android.os.Process.getElapsedCpuTime();
+            int pssKiB = android.os.Debug.getPss();
             long charge = manager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
-            if (rows.size() < 300) rows.add(elapsed+",sample,"+level+","+scale+","+temperature+","+plugged+","+charge+","+thermal);
+            if (rows.size() < 300) rows.add(elapsed+",sample,"+level+","+scale+","+temperature+","+plugged+","+charge+","+thermal+","+cpuMillis+","+pssKiB);
             lastSample = elapsed;
         }
         return thermal >= 3;
@@ -46,9 +48,9 @@ public final class Diagnostics {
     }
 
     public synchronized String export(String role) {
-        return "GEUMBOK_SYNTHETIC_ONLY_V1\nrole="+role+"\nframes="+frames+"\nconnections="+connections
+        return "GEUMBOK_SYNTHETIC_ONLY_V1\nmodel="+Build.MODEL+"\napi="+Build.VERSION.SDK_INT+"\nrole="+role+"\nframes="+frames+"\nconnections="+connections
                 +"\nresizes="+resizes+"\nencoder_creations="+encoderCreations+"\ndecoder_creations="+decoderCreations
-                +"\nsample_fields=elapsed_ms,type,level,scale,temperature_tenths_C,plugged,charge_uAh,thermal\n"
+                +"\nsample_fields=elapsed_ms,type,level,scale,temperature_tenths_C,plugged,charge_uAh,thermal,cpu_ms,pss_KiB\n"
                 +joinedRows()+"\n";
     }
 }

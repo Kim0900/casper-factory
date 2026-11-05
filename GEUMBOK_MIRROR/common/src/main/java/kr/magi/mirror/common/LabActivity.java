@@ -74,7 +74,10 @@ public abstract class LabActivity extends Activity {
         } catch (Exception exception) { endSession("PREPARE_FAILED"); message("Wi-Fi 또는 기기 확인 준비 실패"); }
     }
 
-    protected void watchRoute() { route.watch(() -> main.post(() -> endSession("NETWORK_CHANGED"))); }
+    protected void watchRoute() {
+        WifiRoute selected=route;
+        selected.watch(() -> main.post(() -> {if(route==selected) endSession("NETWORK_CHANGED");}));
+    }
     protected void saveDiagnostics() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("text/plain")
                 .addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE, "geumbok-"+role+"-diagnostics.txt");

@@ -45,6 +45,7 @@ public final class WifiRoute implements AutoCloseable {
     }
 
     public boolean valid() {
+        try {
         NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
         LinkProperties properties = manager.getLinkProperties(network);
         if (capabilities == null || properties == null || !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
@@ -53,6 +54,7 @@ public final class WifiRoute implements AutoCloseable {
             if (address.equals(link.getAddress()) && prefix == link.getPrefixLength()) return true;
         }
         return false;
+        } catch(SecurityException exception) {return false;}
     }
 
     public InetAddress peer(String literal) throws IOException {
