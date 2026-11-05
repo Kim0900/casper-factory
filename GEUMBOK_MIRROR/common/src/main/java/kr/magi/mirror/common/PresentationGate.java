@@ -11,7 +11,7 @@ public final class PresentationGate {
     }
     public void clear() {minimum=Long.MAX_VALUE;last=-1;}
     public boolean accept(long timestampNanos) {
-        if(timestampNanos<minimum || timestampNanos<=last) return false;
+        if(minimum==Long.MAX_VALUE || timestampNanos<minimum || timestampNanos<=last) return false;
         last=timestampNanos;
         return true;
     }

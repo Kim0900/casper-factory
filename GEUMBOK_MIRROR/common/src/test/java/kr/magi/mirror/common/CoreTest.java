@@ -40,6 +40,7 @@ public class CoreTest {
     @Test public void staleAndDuplicateSurfaceFramesCannotUncoverDisplay() {
         PresentationGate gate=new PresentationGate();
         assertFalse(gate.accept(100000));
+        assertFalse(gate.accept(Long.MAX_VALUE));
         gate.begin(200);
         assertFalse(gate.accept(199999));
         assertTrue(gate.accept(200000));

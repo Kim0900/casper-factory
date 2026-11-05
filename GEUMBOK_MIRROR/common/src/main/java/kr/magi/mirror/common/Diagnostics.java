@@ -33,7 +33,7 @@ public final class Diagnostics {
             int temperature = battery == null ? -1 : battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1);
             int plugged = battery == null ? -1 : battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
             long cpuMillis = android.os.Process.getElapsedCpuTime();
-            int pssKiB = android.os.Debug.getPss();
+            long pssKiB = android.os.Debug.getPss();
             long charge = manager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
             if (rows.size() < 300) rows.add(elapsed+",sample,"+level+","+scale+","+temperature+","+plugged+","+charge+","+thermal+","+cpuMillis+","+pssKiB);
             lastSample = elapsed;
