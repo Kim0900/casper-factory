@@ -50,12 +50,13 @@ final class StreamClient implements AutoCloseable {
                     try {tls.startHandshake();} catch(javax.net.ssl.SSLException exception) {throw new SSLHandshakeException("Peer authentication failed");}
                     if(!running||!route.valid()) break;
                     diagnostics.connections++; diagnostics.event("TLS_AUTHENTICATED");
-                    tls.setSoTimeout(750);
+                    tls.setSoTimeout(3500);
                     DataInputStream input=new DataInputStream(tls.getInputStream());
                     Wire.Packet config=Wire.read(input);
                     if(config.type!=Wire.CONFIG) throw new Wire.ProtocolException("Unexpected frame sequence");
-                    decoder=new VideoDecoder(config.data,surface); diagnostics.decoderCreations++;
+                    decoder=new VideoDecoder(config.data,surface,diagnostics); diagnostics.decoderCreations++;
                     listener.configured(decoder.width,decoder.height);
+                    tls.setSoTimeout(750);
                     boolean needsIdr=true;
                     long lastSequence=-1;
                     while(running&&route.valid()) {

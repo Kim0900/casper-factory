@@ -23,6 +23,16 @@ jobs:
       - name: Test, lint and build both APKs
         working-directory: GEUMBOK_MIRROR
         run: gradle testDebugUnitTest lintDebug :sender:assembleDebug :receiver:assembleDebug --no-daemon --stacktrace
+      - name: Verify reproducible signed APKs
+        working-directory: GEUMBOK_MIRROR
+        run: |
+          mkdir -p verification
+          cp sender/build/outputs/apk/debug/sender-debug.apk "$RUNNER_TEMP/geumbok-sender-first.apk"
+          cp receiver/build/outputs/apk/debug/receiver-debug.apk "$RUNNER_TEMP/geumbok-receiver-first.apk"
+          gradle :sender:clean :receiver:clean :sender:assembleDebug :receiver:assembleDebug --no-daemon
+          cmp "$RUNNER_TEMP/geumbok-sender-first.apk" sender/build/outputs/apk/debug/sender-debug.apk
+          cmp "$RUNNER_TEMP/geumbok-receiver-first.apk" receiver/build/outputs/apk/debug/receiver-debug.apk
+          echo 'Two clean app builds produced identical signed APK bytes.' > verification/reproducibility.txt
       - name: Inspect merged manifests and APK signatures
         working-directory: GEUMBOK_MIRROR
         run: |

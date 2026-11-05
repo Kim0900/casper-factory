@@ -23,6 +23,8 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import kr.magi.mirror.common.Wire;
+import kr.magi.mirror.common.CodecPolicy;
+import kr.magi.mirror.common.Diagnostics;
 
 /** One static GPU texture plus a changing frame marker. No screen-capture APIs. */
 final class SyntheticEncoder implements AutoCloseable {
@@ -30,6 +32,7 @@ final class SyntheticEncoder implements AutoCloseable {
     final int width, height, fps, bitrate;
     final Bitmap map;
     private final Listener listener;
+    private final Diagnostics diagnostics;
     private final AtomicBoolean syncRequested = new AtomicBoolean();
     private final AtomicBoolean lowerBitrate = new AtomicBoolean();
     private volatile boolean running = true;
@@ -41,8 +44,8 @@ final class SyntheticEncoder implements AutoCloseable {
     private int program, texture;
     private FloatBuffer vertices, coordinates;
 
-    SyntheticEncoder(int width, int height, int fps, int bitrate, Listener listener) {
-        this.width=width; this.height=height; this.fps=fps; this.bitrate=bitrate; this.listener=listener;
+    SyntheticEncoder(int width, int height, int fps, int bitrate, Diagnostics diagnostics, Listener listener) {
+        this.width=width; this.height=height; this.fps=fps; this.bitrate=bitrate; this.listener=listener; this.diagnostics=diagnostics;
         map = createMap(width, height);
     }
     void start() { new Thread(this::run, "synthetic-encoder").start(); }
@@ -78,6 +81,7 @@ final class SyntheticEncoder implements AutoCloseable {
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL,1);
             format.setInteger(MediaFormat.KEY_PROFILE,MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline);
             codec=MediaCodec.createEncoderByType("video/avc");
+            diagnostics.event("ENCODER_"+CodecPolicy.requireHardware(codec));
             codec.configure(format,null,null,MediaCodec.CONFIGURE_FLAG_ENCODE);
             input=codec.createInputSurface(); codec.start(); setupGl();
             long frame=0, next=SystemClock.elapsedRealtimeNanos();

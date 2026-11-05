@@ -81,6 +81,12 @@ public final class WifiRoute implements AutoCloseable {
             if ((local[i] & mask) != (remote[i] & mask)) return false;
             bits -= 8;
         }
+        if(prefix < 31) {
+            int remoteInt=java.nio.ByteBuffer.wrap(remote).getInt();
+            int hostMask=(int)(0xffffffffL >>> prefix);
+            int host=remoteInt & hostMask;
+            if(host==0 || host==hostMask) return false;
+        }
         return !peer.isMulticastAddress() && !peer.isAnyLocalAddress() && !peer.isLoopbackAddress();
     }
 

@@ -33,7 +33,7 @@ final class StreamServer implements AutoCloseable {
     StreamServer(WifiRoute route,TlsIdentity identity,String peerPin,Diagnostics diagnostics,
                  int width,int height,int fps,int bitrate,SyntheticEncoder.Listener preview,Runnable failed) {
         this.route=route; this.identity=identity; this.peerPin=peerPin; this.diagnostics=diagnostics; this.failed=failed;
-        encoder=new SyntheticEncoder(width,height,fps,bitrate,new SyntheticEncoder.Listener() {
+        encoder=new SyntheticEncoder(width,height,fps,bitrate,diagnostics,new SyntheticEncoder.Listener() {
             @Override public void config(byte[] data) { configuration=data; }
             @Override public void frame(Wire.Packet packet) {
                 diagnostics.frames++;

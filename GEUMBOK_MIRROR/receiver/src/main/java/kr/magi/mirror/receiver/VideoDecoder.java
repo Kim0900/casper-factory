@@ -8,11 +8,13 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import kr.magi.mirror.common.Wire;
+import kr.magi.mirror.common.CodecPolicy;
+import kr.magi.mirror.common.Diagnostics;
 
 final class VideoDecoder implements AutoCloseable {
     final int width,height;
     private final MediaCodec codec;
-    VideoDecoder(byte[] configuration,Surface surface) throws Exception {
+    VideoDecoder(byte[] configuration,Surface surface,Diagnostics diagnostics) throws Exception {
         DataInputStream input=new DataInputStream(new ByteArrayInputStream(configuration));
         width=input.readInt(); height=input.readInt();
         if(!((width==1280&&height==720)||(width==960&&height==540))) throw new Wire.ProtocolException("Unsupported profile");
@@ -21,7 +23,7 @@ final class VideoDecoder implements AutoCloseable {
         MediaFormat format=MediaFormat.createVideoFormat("video/avc",width,height);
         format.setByteBuffer("csd-0",ByteBuffer.wrap(first)); if(second.length>0) format.setByteBuffer("csd-1",ByteBuffer.wrap(second));
         codec=MediaCodec.createDecoderByType("video/avc");
-        try { codec.configure(format,surface,null,0); codec.start(); }
+        try { diagnostics.event("DECODER_"+CodecPolicy.requireHardware(codec)); codec.configure(format,surface,null,0); codec.start(); }
         catch(Exception exception) { codec.release(); throw exception; }
     }
     private static byte[] readCsd(DataInputStream input,boolean allowEmpty) throws IOException {

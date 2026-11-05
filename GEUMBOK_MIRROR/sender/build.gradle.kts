@@ -17,6 +17,10 @@ android {
             keyPassword = "android"
         }
     }
+    packaging {
+        resources.merges += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md",
+            "META-INF/versions/9/OSGI-INF/MANIFEST.MF")
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
