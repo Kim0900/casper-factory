@@ -20,6 +20,7 @@ import android.widget.AdapterView;
 import kr.magi.mirror.common.Geometry;
 import kr.magi.mirror.common.LabActivity;
 import kr.magi.mirror.common.TlsIdentity;
+import kr.magi.mirror.common.PresentationGate;
 
 public final class MainActivity extends LabActivity implements TextureView.SurfaceTextureListener {
     private TextureView video;
@@ -30,7 +31,7 @@ public final class MainActivity extends LabActivity implements TextureView.Surfa
     private Geometry.Mode mode=Geometry.Mode.FIT;
     private float centerX=.5f,centerY=.5f,zoom=2;
     private long lastPresented;
-    private long minimumTimestamp=Long.MAX_VALUE, lastTimestamp=-1;
+    private final PresentationGate presentationGate=new PresentationGate();
     private final Runnable freshnessCheck=new Runnable() {
         @Override public void run() {
             if(!visible) return;
@@ -79,7 +80,7 @@ public final class MainActivity extends LabActivity implements TextureView.Surfa
                                 main.post(()->{if(current==generation) {sourceWidth=width;sourceHeight=height;transform();}});
                             }
                             @Override public void epoch(long presentationUs) {
-                                main.post(()->{if(current==generation) {minimumTimestamp=presentationUs*1000;lastTimestamp=-1;}});
+                                main.post(()->{if(current==generation) {presentationGate.begin(presentationUs);}});
                             }
                             @Override public void blackout() {main.post(()->{if(current==generation) hideVideo();});}
                             @Override public void ended() {main.post(()->{if(current==generation) endSession("STREAM_ENDED");});}
@@ -114,7 +115,7 @@ public final class MainActivity extends LabActivity implements TextureView.Surfa
         matrix.setScale(geometry.scale*sourceWidth/video.getWidth(),geometry.scale*sourceHeight/video.getHeight());
         matrix.postTranslate(geometry.translateX,geometry.translateY); video.setTransform(matrix);
     }
-    private void hideVideo() {lastPresented=0;minimumTimestamp=Long.MAX_VALUE;if(cover!=null)cover.setVisibility(View.VISIBLE);}
+    private void hideVideo() {lastPresented=0;presentationGate.clear();if(cover!=null)cover.setVisibility(View.VISIBLE);}
     @Override protected void onTick() {
         if(client!=null) {
             status.setText("합성 수신 · 표시 프레임 "+diagnostics.frames+" · 인증 연결 "+diagnostics.connections);
@@ -134,8 +135,8 @@ public final class MainActivity extends LabActivity implements TextureView.Surfa
     }
     @Override public void onSurfaceTextureUpdated(SurfaceTexture texture) {
         long timestamp=texture.getTimestamp();
-        if(client!=null && timestamp>=minimumTimestamp && timestamp>lastTimestamp) {
-            lastTimestamp=timestamp;lastPresented=SystemClock.elapsedRealtime();diagnostics.frames++;cover.setVisibility(View.GONE);
+        if(client!=null && presentationGate.accept(timestamp)) {
+            lastPresented=SystemClock.elapsedRealtime();diagnostics.frames++;cover.setVisibility(View.GONE);
         }
     }
 }

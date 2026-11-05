@@ -37,6 +37,23 @@ public class CoreTest {
     @Test(expected=IllegalArgumentException.class) public void invalidRegionRejected() {
         Geometry.calculate(1280,720,300,800,Geometry.Mode.REGION,Float.NaN,.5f,2);
     }
+    @Test public void staleAndDuplicateSurfaceFramesCannotUncoverDisplay() {
+        PresentationGate gate=new PresentationGate();
+        assertFalse(gate.accept(100000));
+        gate.begin(200);
+        assertFalse(gate.accept(199999));
+        assertTrue(gate.accept(200000));
+        assertFalse(gate.accept(200000));
+        gate.clear();
+        assertFalse(gate.accept(210000));
+        gate.begin(300);
+        assertFalse(gate.accept(299999));
+        assertTrue(gate.accept(300000));
+    }
+    @Test public void timestampOverflowRejected() {
+        try {new PresentationGate().begin(Long.MAX_VALUE);fail();}
+        catch(IllegalArgumentException expected) { }
+    }
     @Test public void framingRoundTripAndNoReverseCommands() throws Exception {
         ByteArrayOutputStream bytes=new ByteArrayOutputStream();
         Wire.write(new DataOutputStream(bytes),new Wire.Packet(Wire.FRAME,1,15,99,new byte[]{1,2,3}));

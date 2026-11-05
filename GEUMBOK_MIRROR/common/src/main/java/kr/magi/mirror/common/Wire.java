@@ -39,7 +39,7 @@ public final class Wire {
         long time = input.readLong();
         int length = input.readInt();
         validate(type, flags, length);
-        if (sequence < 0 || time < 0) throw new ProtocolException("Invalid frame metadata");
+        if (sequence < 0 || time < 0 || time > Long.MAX_VALUE/1000) throw new ProtocolException("Invalid frame metadata");
         byte[] data = new byte[length];
         input.readFully(data);
         return new Packet(type, flags, sequence, time, data);
