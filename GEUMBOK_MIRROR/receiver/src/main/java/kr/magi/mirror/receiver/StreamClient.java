@@ -16,7 +16,7 @@ import kr.magi.mirror.common.WifiRoute;
 import kr.magi.mirror.common.Wire;
 
 final class StreamClient implements AutoCloseable {
-    interface Listener { void configured(int width,int height); void blackout(); void ended(); }
+    interface Listener { void configured(int width,int height); void epoch(long presentationUs); void blackout(); void ended(); }
     private final WifiRoute route;
     private final TlsIdentity identity;
     private final String peerPin;
@@ -62,6 +62,7 @@ final class StreamClient implements AutoCloseable {
                         Wire.Packet packet=Wire.read(input);
                         if(packet.type!=Wire.FRAME||packet.sequence<=lastSequence) throw new Wire.ProtocolException("Unexpected frame sequence");
                         if(needsIdr&&packet.flags!=1) throw new Wire.ProtocolException("Unexpected frame sequence");
+                        if(needsIdr) listener.epoch(packet.presentationUs);
                         needsIdr=false; lastSequence=packet.sequence;
                         if(decoder.feed(packet)) outage=null;
                     }

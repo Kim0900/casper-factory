@@ -28,7 +28,10 @@ public class CoreTest {
             Geometry fill=Geometry.calculate(1280,720,width,800,Geometry.Mode.FILL,.5f,.5f,2);
             assertTrue(1280*fill.scale>=width-.01); assertTrue(720*fill.scale>=800-.01);
             Geometry region=Geometry.calculate(1280,720,width,800,Geometry.Mode.REGION,0,1,2);
-            assertTrue(Float.isFinite(region.translateX)); assertTrue(region.translateY<=0);
+            assertTrue(region.translateX >= -.01f);
+            assertTrue(360*region.scale + region.translateY >= -.01f);
+            assertTrue(640*region.scale + region.translateX <= width+.01f);
+            assertTrue(720*region.scale + region.translateY <= 800+.01f);
         }
     }
     @Test(expected=IllegalArgumentException.class) public void invalidRegionRejected() {
