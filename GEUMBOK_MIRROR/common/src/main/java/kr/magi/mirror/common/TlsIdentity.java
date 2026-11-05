@@ -89,18 +89,22 @@ public final class TlsIdentity implements AutoCloseable {
     private static final class PinnedTrust implements X509TrustManager {
         private final byte[] pin;
         PinnedTrust(byte[] pin) { this.pin = pin.clone(); }
-        private void verify(X509Certificate[] chain) throws CertificateException {
+        private boolean matchesPin(X509Certificate[] chain) throws CertificateException {
             try {
                 if (chain == null || chain.length != 1) throw new CertificateException("Unexpected certificate chain");
                 chain[0].checkValidity();
                 chain[0].verify(chain[0].getPublicKey());
                 byte[] actual = MessageDigest.getInstance("SHA-256").digest(chain[0].getPublicKey().getEncoded());
-                if (!MessageDigest.isEqual(pin, actual)) throw new CertificateException("Peer identity mismatch");
+                return MessageDigest.isEqual(pin, actual);
             } catch (CertificateException exception) { throw exception; }
             catch (Exception exception) { throw new CertificateException("Peer verification failed", exception); }
         }
-        @Override public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException { verify(chain); }
-        @Override public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException { verify(chain); }
+        @Override public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            if (!matchesPin(chain)) throw new CertificateException("Client identity mismatch");
+        }
+        @Override public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            if (!matchesPin(chain)) throw new CertificateException("Server identity mismatch");
+        }
         @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
     }
 
