@@ -1,0 +1,44 @@
+name: GEUMBOK MIRROR synthetic G2
+on:
+  push:
+    branches: ['edison/task232-*']
+    paths: ['GEUMBOK_MIRROR/**', '.github/workflows/build-geumbok-mirror.yml']
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Install API 36
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0' > /dev/null
+      - name: Test, lint and build both APKs
+        working-directory: GEUMBOK_MIRROR
+        run: gradle testDebugUnitTest lintDebug :sender:assembleDebug :receiver:assembleDebug --no-daemon --stacktrace
+      - name: Inspect merged manifests and APK signatures
+        working-directory: GEUMBOK_MIRROR
+        run: |
+          python3 tools/verify_artifacts.py
+          for role in sender receiver; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$role/build/outputs/apk/debug/$role-debug.apk" > "verification/$role-signature.txt"
+            "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$role/build/outputs/apk/debug/$role-debug.apk" > "verification/$role-manifest.xml"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geumbok-mirror-synthetic-g2
+          path: |
+            GEUMBOK_MIRROR/sender/build/outputs/apk/debug/*.apk
+            GEUMBOK_MIRROR/receiver/build/outputs/apk/debug/*.apk
+            GEUMBOK_MIRROR/common/build/test-results/
+            GEUMBOK_MIRROR/**/build/reports/
+            GEUMBOK_MIRROR/verification/
+          if-no-files-found: warn

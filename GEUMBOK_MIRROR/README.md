@@ -1,0 +1,16 @@
+# GEUMBOK MIRROR G2 synthetic prototype
+
+Task #232, MAGI authorization #6864. Android 7+ sender and receiver APKs.
+This build transmits only an app-generated map with a 24-bit frame marker. It has no MediaProjection entry point, real navigation capture, Kakao T extraction, remote input, Android Auto, audio, cloud service or telemetry SDK.
+
+Connect both stationary test devices to the same private IPv4 Wi-Fi. Prepare an identity in each app, enter the complete public 64-hex confirmation code from the other device, start the phone sender, and connect the receiver to the phone's displayed numeric Wi-Fi address. Codes and TLS identities expire when the session ends. The socket port is 38443. The receiver uses a Wi-Fi Network socket factory. The sender listener binds the selected exact Wi-Fi IPv4 address and rejects off-subnet peers. Network/address replacement ends the session.
+
+The receiver offers fit, centered fill, and manual ROI center/zoom. Resizing changes only its TextureView transform. Visible onPause continues streaming, while onStop, locking or Surface destruction ends the session. Existing Tasker profiles are not changed. The received pane occupies 70% in the driving preset and 30% in the waiting preset. A fixed 5:5 preset is a separately recorded fallback.
+
+Only a socket outage on the unchanged Wi-Fi can retry, at 250/500/1000ms with three attempts and a 15-second episode limit. Every attempt uses a fresh TLS context and mutual SPKI pin validation. Old decoder/transport queues are destroyed and a newly requested IDR is required. Authentication failure, stopping, locking and network replacement end the session. The receiver's missing-frame cover uses the actual TextureView update callback and a conservative timer, to be measured on hardware against the 750ms criterion.
+
+The pipeline uploads one static synthetic map texture, then draws frame markers with GLES. No per-frame bitmap encode/copy path is used. Sender preview updates are asynchronous and their UI scheduling error must be included in any external-camera latency measurement.
+
+Build with JDK21, Gradle9.6.0, AGP9.4.0, SDK36. Run gradle testDebugUnitTest lintDebug :sender:assembleDebug :receiver:assembleDebug. tools/verify_artifacts.py inspects both merged manifests and APK digests. The branch workflow also records actual APK manifest/signature evidence. These tests do not measure S25+/Tab A performance, split-screen gaps, Tasker interference, thermal behaviour or runtime external egress.
+
+Physical tests await the representative's tablet model/OS. Freeze the authorized acceptance values before those tests. Use the same conditions for OFF/ON 60-minute runs. Log temperature, battery, thermal state and interruption data, retain failed runs, and submit through CASSANDRA then MAGI. Synthetic pipeline results must not be described as successful real-screen mirroring or operational approval.
