@@ -24,6 +24,10 @@ public class TlsTest {
             assertFalse(exchange(server,client,outsider.fingerprint(),server.fingerprint()));
         }
     }
+    @Test public void unusedEstTrustImplementationIsNotOnRuntimeClasspath() {
+        try {Class.forName("org.bouncycastle.est.jcajce.JcaJceUtils");fail();}
+        catch(ClassNotFoundException expected) { }
+    }
     @Test public void expiredLocalSessionCannotCreateTlsContext() throws Exception {
         TlsIdentity identity=new TlsIdentity();String pin=identity.fingerprint();identity.close();
         try {identity.context(pin);fail();} catch(IllegalStateException expected) { }

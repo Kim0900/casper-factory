@@ -6,15 +6,12 @@ android {
         applicationId = "kr.magi.mirror.sender"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-synthetic"
+        versionCode = 2
+        versionName = "0.1.1-synthetic"
     }
-    signingConfigs {
+    buildTypes {
         getByName("debug") {
-            storeFile = file("../keystore/geumbok-debug.p12")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            signingConfig = null
         }
     }
     packaging {
