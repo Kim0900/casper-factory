@@ -1,0 +1,87 @@
+name: GEUMBOK MIRROR synthetic G2
+on:
+  push:
+    branches: ['edison/task232-*']
+    paths: ['GEUMBOK_MIRROR/**', '.github/workflows/build-geumbok-mirror.yml']
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Install API 36
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0' > /dev/null
+      - name: Test, lint and build unsigned APKs
+        working-directory: GEUMBOK_MIRROR
+        run: gradle testDebugUnitTest lintDebug :sender:assembleDebug :receiver:assembleDebug --no-daemon --stacktrace
+      - name: Verify reproducible unsigned APKs
+        working-directory: GEUMBOK_MIRROR
+        run: |
+          mkdir -p verification
+          cp -a sender/build/reports verification/sender-reports
+          cp -a receiver/build/reports verification/receiver-reports
+          cp sender/build/outputs/apk/debug/sender-debug-unsigned.apk "$RUNNER_TEMP/geumbok-sender-first.apk"
+          cp receiver/build/outputs/apk/debug/receiver-debug-unsigned.apk "$RUNNER_TEMP/geumbok-receiver-first.apk"
+          gradle :sender:clean :receiver:clean :sender:assembleDebug :receiver:assembleDebug --no-daemon
+          cmp "$RUNNER_TEMP/geumbok-sender-first.apk" sender/build/outputs/apk/debug/sender-debug-unsigned.apk
+          cmp "$RUNNER_TEMP/geumbok-receiver-first.apk" receiver/build/outputs/apk/debug/receiver-debug-unsigned.apk
+          echo 'Two clean app builds produced identical unsigned APK bytes.' > verification/reproducibility.txt
+      - name: Inspect manifests and prove BC EST runtime absence
+        working-directory: GEUMBOK_MIRROR
+        run: |
+          python3 tools/verify_artifacts.py
+          python3 tools/audit_bc.py
+          for role in sender receiver; do
+            "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$role/build/outputs/apk/debug/$role-debug-unsigned.apk" > "verification/$role-manifest.xml"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geumbok-unsigned-verification
+          path: |
+            GEUMBOK_MIRROR/sender/build/outputs/apk/debug/*-unsigned.apk
+            GEUMBOK_MIRROR/receiver/build/outputs/apk/debug/*-unsigned.apk
+            GEUMBOK_MIRROR/common/build/test-results/
+            GEUMBOK_MIRROR/common/build/reports/
+            GEUMBOK_MIRROR/verification/
+          if-no-files-found: warn
+  sign:
+    needs: verify
+    if: github.repository == 'Kim0900/casper-factory' && (github.ref == 'refs/heads/edison/task232-g2-synthetic' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/download-artifact@v4
+        with:
+          name: geumbok-unsigned-verification
+          path: GEUMBOK_MIRROR
+      - name: Install signing tools
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0' > /dev/null
+      - name: Sign only with protected GitHub Secrets
+        working-directory: GEUMBOK_MIRROR
+        env:
+          GEUMBOK_SIGNING_KEY_B64: ${{ secrets.GEUMBOK_SIGNING_KEY_B64 }}
+          GEUMBOK_SIGNING_PASSWORD: ${{ secrets.GEUMBOK_SIGNING_PASSWORD }}
+          GEUMBOK_SIGNING_CERT_SHA256: ${{ secrets.GEUMBOK_SIGNING_CERT_SHA256 }}
+        run: bash tools/sign_ci.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geumbok-protected-signed-apks
+          path: |
+            GEUMBOK_MIRROR/signed/*.apk
+            GEUMBOK_MIRROR/verification/*-signature.txt
+            GEUMBOK_MIRROR/verification/signed-artifacts.sha256
+          if-no-files-found: error
