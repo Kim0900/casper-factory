@@ -24,7 +24,7 @@ public abstract class LabActivity extends Activity {
     protected TextView status;
     protected String role;
     protected TlsIdentity identity;
-    protected WifiRoute route;
+    protected volatile LocalRoute route;
     protected volatile boolean visible;
     private final Runnable monitor = new Runnable() {
         @Override public void run() {
@@ -66,17 +66,23 @@ public abstract class LabActivity extends Activity {
     protected void prepare(TextView fingerprint, TextView address) {
         endSession("PREPARE");
         try {
-            route = WifiRoute.select(this);
+            route = selectRoute();
             identity = new TlsIdentity();
             fingerprint.setText(identity.fingerprint());
-            address.setText("Wi-Fi 주소  " + route.address.getHostAddress());
+            address.setText(route.label()+"  " + route.address.getHostAddress());
             message("상대 기기에 위 64자리 확인 코드를 입력하세요");
-        } catch (Exception exception) { endSession("PREPARE_FAILED"); message("Wi-Fi 또는 기기 확인 준비 실패"); }
+        } catch (Exception exception) { endSession("PREPARE_FAILED"); message(preparationFailureMessage()); }
     }
 
+    protected LocalRoute selectRoute() throws Exception { return WifiRoute.select(this); }
+    protected String preparationFailureMessage() { return "Wi-Fi 또는 기기 확인 준비 실패"; }
+    protected void onTransportInvalidated(LocalRoute invalid) { }
     protected void watchRoute() {
-        WifiRoute selected=route;
-        selected.watch(() -> main.post(() -> {if(route==selected) endSession("NETWORK_CHANGED");}));
+        LocalRoute selected=route;
+        selected.watch(() -> {
+            onTransportInvalidated(selected);
+            main.post(() -> {if(route==selected) endSession("NETWORK_CHANGED");});
+        });
     }
     protected void saveDiagnostics() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("text/plain")
