@@ -2,6 +2,7 @@
 from pathlib import Path
 import hashlib
 import json
+from audit_receiver_api import audit_receiver
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
@@ -25,6 +26,9 @@ for role in ('sender', 'receiver'):
     assert manifest.find('uses-sdk').get(android+'minSdkVersion') == '24'
     apk = root / role / f'build/outputs/apk/debug/{role}-debug-unsigned.apk'
     assert apk.is_file()
+    if role == 'receiver':
+        result['receiver_api_isolation'] = audit_receiver(root, apk)
+
     result['apps'][role] = {'permissions': sorted(permissions), 'sha256': hashlib.sha256(apk.read_bytes()).hexdigest()}
 tracked = __import__('subprocess').check_output(['git', 'ls-files', 'GEUMBOK_MIRROR'], cwd=root.parent, text=True).splitlines()
 assert not any(Path(name).suffix in ('.p12', '.jks', '.keystore') for name in tracked)

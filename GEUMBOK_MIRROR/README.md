@@ -1,5 +1,7 @@
 # GEUMBOK MIRROR G2 synthetic prototype
 
+Hotspot follow-up (#232 / MAGI #6959): version0.1.2 adds explicit sender AP mode using public Android16/API36 tethering status, exact private IPv4 binding and terminal socket cleanup. Receiver/API27 remains a Wi-Fi client. No additional permissions. See [route, tests and device boundary](HOTSPOT_AP_ROUTE.md). Shared-router testing does not prove hotspot acceptance.
+
 Task #232, MAGI authorization #6864. Android 7+ sender and receiver APKs.
 This build transmits only an app-generated map with a 24-bit frame marker. It has no MediaProjection entry point, real navigation capture, Kakao T extraction, remote input, Android Auto, audio, cloud service or telemetry SDK.
 

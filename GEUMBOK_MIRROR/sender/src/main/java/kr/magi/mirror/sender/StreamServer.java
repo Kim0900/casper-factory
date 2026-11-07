@@ -13,12 +13,12 @@ import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSocket;
 import kr.magi.mirror.common.Diagnostics;
 import kr.magi.mirror.common.TlsIdentity;
-import kr.magi.mirror.common.WifiRoute;
+import kr.magi.mirror.common.LocalRoute;
 import kr.magi.mirror.common.Wire;
 
 final class StreamServer implements AutoCloseable {
     static final int PORT=38443;
-    private final WifiRoute route;
+    private final LocalRoute route;
     private final TlsIdentity identity;
     private final String peerPin;
     private final Diagnostics diagnostics;
@@ -30,7 +30,7 @@ final class StreamServer implements AutoCloseable {
     private volatile SSLSocket client;
     private volatile ServerSocket server;
 
-    StreamServer(WifiRoute route,TlsIdentity identity,String peerPin,Diagnostics diagnostics,
+    StreamServer(LocalRoute route,TlsIdentity identity,String peerPin,Diagnostics diagnostics,
                  int width,int height,int fps,int bitrate,SyntheticEncoder.Listener preview,Runnable failed) {
         this.route=route; this.identity=identity; this.peerPin=peerPin; this.diagnostics=diagnostics; this.failed=failed;
         encoder=new SyntheticEncoder(width,height,fps,bitrate,diagnostics,new SyntheticEncoder.Listener() {
@@ -46,6 +46,7 @@ final class StreamServer implements AutoCloseable {
     android.graphics.Bitmap map() { return encoder.map; }
     void start() { new Thread(this::run,"synthetic-server").start(); }
     void lowerBitrate() { encoder.lowerBitrate(); }
+    void invalidateRoute(LocalRoute invalid) { if(route==invalid) close(); }
     private void run() {
         boolean sourceStarted=false;
         long deadline=SystemClock.elapsedRealtime()+120000;
@@ -55,13 +56,14 @@ final class StreamServer implements AutoCloseable {
                 Socket accepted;
                 try { accepted=server.accept(); } catch(SocketTimeoutException exception) { continue; }
                 if(!route.allows(accepted.getInetAddress())) { accepted.close(); continue; }
+                route.protect(accepted);
                 accepted.setTcpNoDelay(true);
                 try {
                     // Listener is bound to the selected Wi-Fi address, never 0.0.0.0.
                     SSLContext context=identity.context(peerPin);
                     SSLSocket tls=(SSLSocket)context.getSocketFactory().createSocket(accepted,
                             accepted.getInetAddress().getHostAddress(),accepted.getPort(),true);
-                    client=tls; TlsIdentity.configure(tls,false); tls.setSoTimeout(3500);
+                    route.protect(tls); client=tls; TlsIdentity.configure(tls,false); tls.setSoTimeout(3500);
                     try {tls.startHandshake();} catch(javax.net.ssl.SSLException exception) {throw new SSLHandshakeException("Peer authentication failed");}
                     if(!route.valid() || !running) throw new IOException("Network ended");
                     diagnostics.connections++; diagnostics.event("TLS_AUTHENTICATED");

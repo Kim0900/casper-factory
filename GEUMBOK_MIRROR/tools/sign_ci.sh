@@ -20,7 +20,7 @@ retired='10731e0ea7f530b66e8a160121fec5c4e0b9c82741c68e09f092162891e5d570'
 mkdir -p "$root/signed" "$root/verification"
 for role in sender receiver; do
     input="$root/$role/build/outputs/apk/debug/$role-debug-unsigned.apk"
-    output="$root/signed/geumbok-$role-0.1.1-synthetic.apk"
+    output="$root/signed/geumbok-$role-0.1.2-synthetic.apk"
     if "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$input" >/dev/null 2>&1; then
         echo 'Expected an unsigned CI build.' >&2
         exit 1

@@ -12,12 +12,12 @@ import javax.net.ssl.SSLSocket;
 import kr.magi.mirror.common.Diagnostics;
 import kr.magi.mirror.common.RetryBudget;
 import kr.magi.mirror.common.TlsIdentity;
-import kr.magi.mirror.common.WifiRoute;
+import kr.magi.mirror.common.LocalRoute;
 import kr.magi.mirror.common.Wire;
 
 final class StreamClient implements AutoCloseable {
     interface Listener { void configured(int width,int height); void epoch(long presentationUs); void blackout(); void ended(); }
-    private final WifiRoute route;
+    private final LocalRoute route;
     private final TlsIdentity identity;
     private final String peerPin;
     private final InetAddress peer;
@@ -27,7 +27,7 @@ final class StreamClient implements AutoCloseable {
     private volatile boolean running=true;
     private volatile Socket connection;
 
-    StreamClient(WifiRoute route,TlsIdentity identity,String peerPin,InetAddress peer,Surface surface,
+    StreamClient(LocalRoute route,TlsIdentity identity,String peerPin,InetAddress peer,Surface surface,
                  Diagnostics diagnostics,Listener listener) {
         this.route=route; this.identity=identity; this.peerPin=peerPin; this.peer=peer;
         this.surface=surface; this.diagnostics=diagnostics; this.listener=listener;
