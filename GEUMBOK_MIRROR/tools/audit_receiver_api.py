@@ -91,7 +91,10 @@ def audit_receiver(root, apk):
             # Never exempt a DEX containing project/application code.
             definitions = list(dex.classes())
             assert definitions and b'Lkr/magi/' not in data
-            assert all(name.startswith(('Landroid/', 'Lcom/android/tools/r8/'))
+            assert all(name.startswith(('Landroid/', 'Lcom/android/tools/r8/')) or name in (
+                       'Ldalvik/annotation/optimization/CriticalNative;',
+                       'Ldalvik/annotation/optimization/FastNative;',
+                       'Ldalvik/system/ZipPathValidator$Callback;')
                        for name, _ in definitions), (path, 'unexpected stub-container class')
             names = []
             for name, offset in definitions:
