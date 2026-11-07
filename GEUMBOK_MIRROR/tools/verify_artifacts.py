@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib
 import json
-import zipfile
+from audit_receiver_api import audit_receiver
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
@@ -27,10 +27,7 @@ for role in ('sender', 'receiver'):
     apk = root / role / f'build/outputs/apk/debug/{role}-debug-unsigned.apk'
     assert apk.is_file()
     if role == 'receiver':
-        with zipfile.ZipFile(apk) as archive:
-            for name in archive.namelist():
-                if name.endswith('.dex'):
-                    assert b'Landroid/net/Tethering' not in archive.read(name), 'API36 tethering types leaked into receiver'
+        result['receiver_api_isolation'] = audit_receiver(root, apk)
 
     result['apps'][role] = {'permissions': sorted(permissions), 'sha256': hashlib.sha256(apk.read_bytes()).hexdigest()}
 tracked = __import__('subprocess').check_output(['git', 'ls-files', 'GEUMBOK_MIRROR'], cwd=root.parent, text=True).splitlines()

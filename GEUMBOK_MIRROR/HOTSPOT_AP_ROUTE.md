@@ -26,7 +26,7 @@ Interface-set changes revoke on the system callback. A dedicated worker checks a
 
 ## Compatibility and signing
 
-API36 classes exist only in the sender module and the entry point checks `SDK_INT >= 36`. Receiver minSdk24 remains; receiver DEX must contain no `android.net.Tethering*` references. Its Wi-Fi `Network` client, video/display and codec behavior remain. The shared base adds socket ownership for cleanup. Sender on older Android can explicitly use the common-AP mode; hotspot mode reports unavailable.
+API36 classes exist only in the sender module and the entry point checks `SDK_INT >= 36`. Receiver minSdk24 remains; compiled receiver/common project classes must contain no tethering or sender-monitor reference. The APK gate also rejects sender-monitor inclusion. D8 already bundles synthetic framework throwing stubs in the approved baseline (receiver `classes5.dex`, SHA256 `238a5c8606074db0fd8800daf30296e7e4fbd67620ccd357dd2cae743e5db8f4`). The gate recognizes only a separate framework/R8 synthetic container and verifies every tethering definition is a synthetic initializer throwing `NoClassDefFoundError`, with no tethering field or functional method reference. This static check does not replace API27 device execution. Its Wi-Fi `Network` client, video/display and codec behavior remain. The shared base adds socket ownership for cleanup. Sender on older Android can explicitly use the common-AP mode; hotspot mode reports unavailable.
 
 Both APKs are versionCode3, `0.1.2-synthetic`, still debug synthetic test builds. The existing three signing Secrets/certificate and old-certificate rejection are retained. Workflow signing adds this exact branch to its allowlist, without a branch wildcard, fork or pull_request Secret path.
 
