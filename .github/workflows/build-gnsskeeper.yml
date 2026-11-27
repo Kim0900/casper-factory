@@ -1,34 +1,55 @@
-name: Build GNSSKeeper APK
-
+name: Build and test GNSSKeeper release
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'fix/gnsskeeper-*' ]
     paths:
       - 'GNSSKeeper/**'
+      - '.github/workflows/build-gnsskeeper.yml'
   workflow_dispatch: {}
-
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Build debug APK
-        working-directory: GNSSKeeper
-        run: gradle assembleDebug --no-daemon --stacktrace
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          name: GNSSKeeper-debug-apk
-          path: GNSSKeeper/app/build/outputs/apk/debug/*.apk
+          gradle-version: '9.6.0'
+      - name: Install Android API 36
+        shell: bash
+        run: |
+          SDKM="$(find "${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --install 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify backup policy and defective fixtures
+        run: python3 GNSSKeeper/verification/check_security.py
+      - name: Release unit tests, lint and unsigned assembly
+        working-directory: GNSSKeeper
+        run: gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --no-daemon --stacktrace --continue
+      - name: Stage APK and verification tools
+        run: |
+          mkdir -p GNSSKeeper/staging-tools
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" GNSSKeeper/staging-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" GNSSKeeper/staging-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt2" GNSSKeeper/staging-tools/
+          mkdir -p GNSSKeeper/staging-tools/lib64
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib64/libc++.so" GNSSKeeper/staging-tools/lib64/
+          test -s GNSSKeeper/app/build/outputs/apk/release/app-release-unsigned.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: GNSSKeeper-v029-build-and-test-evidence
+          path: |
+            GNSSKeeper/app/build/outputs/apk/release/*.apk
+            GNSSKeeper/app/build/reports/tests/
+            GNSSKeeper/app/build/test-results/
+            GNSSKeeper/app/build/reports/lint-results*
+            GNSSKeeper/app/build/intermediates/merged_manifests/release/
+            GNSSKeeper/staging-tools/
           if-no-files-found: error
