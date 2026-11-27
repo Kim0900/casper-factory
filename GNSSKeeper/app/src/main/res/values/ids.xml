@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="exportStatus" type="id" />
+    <item name="exportSessions" type="id" />
+    <item name="exportSelectAll" type="id" />
+    <item name="exportSave" type="id" />
+</resources>
