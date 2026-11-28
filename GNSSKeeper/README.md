@@ -1,3 +1,12 @@
+# v0.3.0 관측 강화 + 자동 복구 (Q-1128-G1I, 미배포 후보)
+
+- **자동 복구(§18):** 실행 중에는 `START_STICKY`. OS가 프로세스를 종료한 뒤 시스템이 서비스를 재생성하면(intent=null) 저장된 `run_intent`·`last_mode`로 새 세션을 시작합니다. 앱 정지 버튼·작업 관리자 중지·강제 중지(`REASON_USER_REQUESTED`)는 재시작하지 않고 공백에서 뺍니다. 복원 순서: 중단(halted) 확인 → run_intent → 직전 종료 사유 → 같은 부팅 10분 창 3회/시작 실패 연속 2회 → 시도 기록 commit(실패 시 재시작 안 함) → 시작. 중단은 앱에서 직접 시작할 때만 해제됩니다. 삼성 등 OEM이 재생성을 해 준다는 보장은 없습니다.
+- **새 권한 없음:** `ACCESS_BACKGROUND_LOCATION`·`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`를 추가하지 않습니다(`check_security.py`가 거부). 배터리 최적화는 설정 목록 화면 이동만 안내합니다. 재시작이 막히면 "눌러서 다시 켜기" 알림으로 앱을 열어 전경에서 시작합니다.
+- **기록(schema 3):** events.csv에 `PREV_EXIT`·`USER_STOP_EXTERNAL`·`SERVICE_STARTED`·`FGS_STARTED`·`LOCATION_REGISTERED`·`FIRST_FIX`·`AUTO_RESTART`·`RECOVERY_GAP`·`RESTART_BLOCKED`·`RESTART_HALTED`·`LOG_CAP` 등 추가(열 변경 없음). 공백의 "켜짐"은 첫 유효 fix 시각입니다. `gnss_measurements.csv` 끝에 `adr_valid_count,multipath_detected_count,clock_interval_ms` 추가, ACTIVE에 `gnss_constellation.csv`(위성계×대역 5초 요약) 추가, 세션 시작 시 `GNSS_HW`·`GNSS_CAPABILITIES`·`FULL_TRACKING_REQUESTED`(요청값) 기록.
+- **로그 상한:** 세션 폴더당 20 MB 하드 상한(메타데이터 포함, 종료 이벤트 예약 64 KB). 도달 시 요약 기록만 멈추고 `LOG_CAP` 기록, 위치 서비스는 계속합니다.
+- **요청 불변:** 위치·GNSS 요청 파라미터는 v0.2.8과 같으며 `RequestSpec` 한 곳에서만 만들어 수동 시작·자동 재시작이 동일합니다(단위시험 고정). 요청 불변이 전력 불변을 뜻하지는 않습니다(가동 시간 증가).
+- 설계: jarvis-bot `docs/GNSS_KEEPER_ADVANCED_OPTIMIZATION_FEASIBILITY_REPORT_v1.3.md` §3·§18. 실기기 검증(§18-8)과 카산드라 확인·대표 승인 전 설치·배포하지 않습니다.
+
 # v0.2.9 상태 대시보드
 
 발열·위치 갱신·실행·인터넷·절전·이 앱 위치 권한을 색상과 문구로 표시합니다. [표시 기준과 검증 범위](verification/DASHBOARD_029.md)를 참고하세요. 기존 전용 서명을 유지하므로 v0.2.7/0.2.8 위에 업데이트하며, 기존 로그를 삭제하지 않습니다. 이 기능은 카카오콜 수신률 향상 증거가 아닙니다.
@@ -12,7 +21,7 @@ Android 12 이상에서 위치 전달을 관찰하고, 사용자가 선택하면
 
 ## 실행과 기록
 
-정확한 위치 권한과 기기 위치 설정이 필요합니다. Android 12의 위치 요청에는 FINE/COARSE를 함께 사용합니다. Android 13 이상 알림을 거부해도 시작할 수 있으며 앱 화면에서 실행 상태를 확인할 수 있습니다. 실행 버튼은 사용자가 앱을 연 상태에서 누릅니다. 서비스 자동 재시작은 사용하지 않습니다.
+정확한 위치 권한과 기기 위치 설정이 필요합니다. Android 12의 위치 요청에는 FINE/COARSE를 함께 사용합니다. Android 13 이상 알림을 거부해도 시작할 수 있으며 앱 화면에서 실행 상태를 확인할 수 있습니다. 실행 버튼은 사용자가 앱을 연 상태에서 누릅니다. (v0.2.9까지) 서비스 자동 재시작은 사용하지 않습니다 — v0.3.0은 위 자동 복구 참조.
 
 시작·모드 전환마다 고유한 세션 폴더를 만듭니다. 파일 기록과 종료는 별도 직렬 작업 스레드에서 처리하고 저장 실패·대기열 초과를 정상 실행으로 표시하지 않습니다.
 
@@ -42,6 +51,6 @@ python3 verification/check_security.py
 gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --no-daemon
 ```
 
-CI는 비디버그 릴리스 미서명 APK와 시험 증거를 만들며 설치 파일은 기존 전용키로 서명한 후 제공합니다. 패키지는 `kr.magi.gnsskeeper`, versionCode는 10입니다. v0.2.6 기준 인증서 SHA256은 `0bd45bc4ab9f0795c1f960cd40334b8fa02e5bd7eebc7ee1066add68e816c251`이며 반드시 일치해야 합니다. 키·암호·실제 이동 기록을 저장소나 CI에 올리지 않습니다.
+CI는 비디버그 릴리스 미서명 APK와 시험 증거를 만들며 설치 파일은 기존 전용키로 서명한 후 제공합니다. 패키지는 `kr.magi.gnsskeeper`, versionCode는 12(v0.3.0)입니다. v0.2.6 기준 인증서 SHA256은 `0bd45bc4ab9f0795c1f960cd40334b8fa02e5bd7eebc7ee1066add68e816c251`이며 반드시 일치해야 합니다. 키·암호·실제 이동 기록을 저장소나 CI에 올리지 않습니다.
 
 v0.2.6과의 실제 업데이트/로그 보존, 권한·잠금·장시간 동작, 실제 클라우드 복원 및 Galaxy D2D, 다른 검증자의 독립 재현은 별도 완료 증거가 필요합니다. 인증서 불일치를 해결하기 위해 기존 앱을 자동 삭제하거나 로그를 지우지 않습니다. 과거 S19 19건과 SR05 4건은 수정 전 원본 증거로 별도 보존합니다.

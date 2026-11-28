@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.widget.ImageView;
@@ -21,7 +22,7 @@ public final class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView state, detail;
     private ImageView radar;
-    private String pendingMode, notice = "";
+    private String pendingMode, pendingCause = GnssKeeperService.CAUSE_MANUAL, notice = "";
     private boolean permissionInFlight, notificationChecked, waitingSettings;
     private float angle;
     private final Runnable refresh = new Runnable() {
@@ -38,6 +39,7 @@ public final class MainActivity extends Activity {
         state = findViewById(R.id.txtState); detail = findViewById(R.id.txtDetail); radar = findViewById(R.id.imgRadar);
         if (saved != null) {
             pendingMode = saved.getString("pending_mode"); notice = saved.getString("notice", "");
+            pendingCause = saved.getString("pending_cause", GnssKeeperService.CAUSE_MANUAL);
             permissionInFlight = saved.getBoolean("permission_in_flight");
             notificationChecked = saved.getBoolean("notification_checked"); waitingSettings = saved.getBoolean("waiting_settings");
         }
@@ -50,21 +52,44 @@ public final class MainActivity extends Activity {
             render();
         });
         findViewById(R.id.btnExport).setOnClickListener(v -> startActivity(new Intent(this, LogExportActivity.class)));
+        // §18-3: settings list navigation only — no REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission/dialog.
+        findViewById(R.id.btnBatteryOpt).setOnClickListener(v -> {
+            try { startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); }
+            catch (RuntimeException ex) { notice = "설정 → 배터리에서 GNSS Keeper를 절전 예외 앱으로 추가하세요"; render(); }
+        });
+        if (saved == null) handleRestore(getIntent());
         findViewById(R.id.btnSettings).setOnClickListener(v -> {
             pendingMode = null;
             try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); }
             catch (RuntimeException ex) { notice = "Android 설정에서 이 앱의 권한을 확인하세요"; render(); }
         });
     }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); handleRestore(intent);
+    }
+    /** §18-2: the "꺼졌습니다 — 눌러서 다시 켜기" notification opens the app; the start happens in the foreground. */
+    private void handleRestore(Intent intent) {
+        if (intent == null) return;
+        String mode = intent.getStringExtra(GnssKeeperService.EXTRA_RESTORE_MODE);
+        intent.removeExtra(GnssKeeperService.EXTRA_RESTORE_MODE);
+        if (GnssSnapshot.MODE_ACTIVE.equals(mode) || GnssSnapshot.MODE_PASSIVE.equals(mode)) {
+            requestStart(mode, GnssKeeperService.CAUSE_NOTIFICATION);
+        }
+    }
+    private boolean batteryOptimizationIgnored() {
+        PowerManager pm = getSystemService(PowerManager.class);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
     private boolean preciseAllowed() { return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED; }
     private boolean locationEnabled() {
         LocationManager lm = getSystemService(LocationManager.class);
         return lm != null && lm.isLocationEnabled();
     }
-    private void requestStart(String mode) {
+    private void requestStart(String mode) { requestStart(mode, GnssKeeperService.CAUSE_MANUAL); }
+    private void requestStart(String mode, String cause) {
         if (permissionInFlight) return;
         if ("STOPPING".equals(GnssSnapshot.phase)) { notice = "이전 세션 기록을 종료하고 있습니다. 완료 후 다시 시작하세요"; render(); return; }
-        pendingMode = mode; notice = ""; notificationChecked = false;
+        pendingMode = mode; pendingCause = cause; notice = ""; notificationChecked = false;
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)) {
             pendingMode = null; notice = "GNSS를 지원하는 기기가 필요합니다"; render(); return;
         }
@@ -96,14 +121,15 @@ public final class MainActivity extends Activity {
             notificationChecked = true; permissionInFlight = true;
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATION); return;
         }
-        String mode = pendingMode; pendingMode = null;
+        String mode = pendingMode, cause = pendingCause; pendingMode = null; pendingCause = GnssKeeperService.CAUSE_MANUAL;
         // Notification denial does not prohibit a user-started location foreground service.
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             notice = "알림이 차단되어 알림창에 상태가 표시되지 않을 수 있습니다. 앱 화면에서 실행 상태를 확인하세요";
         try {
             if (!preciseAllowed() || !locationEnabled()) throw new SecurityException();
             startForegroundService(new Intent(this, GnssKeeperService.class).setAction(
-                    GnssSnapshot.MODE_PASSIVE.equals(mode) ? GnssKeeperService.ACTION_START_PASSIVE : GnssKeeperService.ACTION_START_ACTIVE));
+                    GnssSnapshot.MODE_PASSIVE.equals(mode) ? GnssKeeperService.ACTION_START_PASSIVE : GnssKeeperService.ACTION_START_ACTIVE)
+                    .putExtra(GnssKeeperService.EXTRA_CAUSE, cause));
         } catch (SecurityException | IllegalStateException | IllegalArgumentException ex) {
             notice = "시작 요청 실패: 위치 권한·기기 위치 설정을 확인하고 앱을 연 상태에서 다시 시작하세요";
         }
@@ -114,7 +140,7 @@ public final class MainActivity extends Activity {
         if (request == REQ_LOCATION || request == REQ_NOTIFICATION) { permissionInFlight = false; continueStart(); }
     }
     @Override protected void onSaveInstanceState(Bundle out) {
-        out.putString("pending_mode", pendingMode); out.putString("notice", notice);
+        out.putString("pending_mode", pendingMode); out.putString("pending_cause", pendingCause); out.putString("notice", notice);
         out.putBoolean("permission_in_flight", permissionInFlight); out.putBoolean("notification_checked", notificationChecked);
         out.putBoolean("waiting_settings", waitingSettings); super.onSaveInstanceState(out);
     }
@@ -143,6 +169,14 @@ public final class MainActivity extends Activity {
         StringBuilder text = new StringBuilder();
         if (!notice.isEmpty()) text.append(notice).append("\n\n");
         if (!GnssSnapshot.lastError.isEmpty()) text.append(GnssSnapshot.lastError).append("\n\n");
+        RecoveryState recovery = new RecoveryStore(this).load();
+        if (recovery.halted) text.append("자동 복구 중단됨(10분 내 반복 실패) — 시작 버튼으로 직접 켜면 해제됩니다\n\n");
+        text.append("자동 복구: ").append(recovery.runIntent ? "켜짐(정지 버튼으로 끄면 재시작 안 함)" : "꺼짐").append("\n")
+                .append("배터리 최적화: ").append(batteryOptimizationIgnored() ? "예외 적용됨" : "예외 아님 — ‘배터리 최적화 설정’에서 제외 권장").append("\n")
+                .append("삼성: 설정 → 배터리 → 백그라운드 사용 한도 → 절전 예외 앱에 추가, ‘사용하지 않는 앱을 절전 상태로 전환’ 끄기\n");
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            text.append("알림 권한 꺼짐 — 자동 복구 실패를 알릴 수 없음\n");
+        text.append("\n");
         text.append("공통 관찰: PASSIVE · ").append(GnssSnapshot.observerRegistered ? "등록됨" : "미등록").append("\n")
                 .append("원 공급자: ").append(GnssSnapshot.sourceProvider.isEmpty() ? "N/A" : GnssSnapshot.sourceProvider).append("\n")
                 .append("마지막 수신: ").append(age(GnssSnapshot.lastObserverNanos, now)).append("\n")

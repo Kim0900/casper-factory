@@ -29,6 +29,9 @@ def validate(manifest, rules):
     export = [a for a in app.findall('activity') if a.get(A+'name','').endswith('LogExportActivity')]
     assert len(export) == 1 and export[0].get(A+'exported') == 'false'
     assert not any('STORAGE' in p or 'MANAGE_EXTERNAL' in p for p in perms)
+    # v0.3 (Q-1128-G1I): auto recovery adds NO permissions — no "Allow all the time", no battery-optimization request.
+    assert 'android.permission.ACCESS_BACKGROUND_LOCATION' not in perms
+    assert 'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' not in perms
 
 if __name__ == '__main__':
     manifest = ET.parse(ROOT / 'AndroidManifest.xml').getroot()
@@ -43,8 +46,10 @@ if __name__ == '__main__':
     r=copy.deepcopy(rules); r.find('cloud-backup/exclude').set('path','gnss_logs'); fixtures.append(('partial_root_exclusion',manifest,r))
     m=copy.deepcopy(manifest); next(a for a in m.find('application').findall('activity') if a.get(A+'name','').endswith('LogExportActivity')).set(A+'exported','true'); fixtures.append(('export_activity_exposed',m,rules))
     m=copy.deepcopy(manifest); ET.SubElement(m,'uses-permission',{A+'name':'android.permission.MANAGE_EXTERNAL_STORAGE'}); fixtures.append(('broad_storage_permission',m,rules))
+    m=copy.deepcopy(manifest); ET.SubElement(m,'uses-permission',{A+'name':'android.permission.ACCESS_BACKGROUND_LOCATION'}); fixtures.append(('background_location_added',m,rules))
+    m=copy.deepcopy(manifest); ET.SubElement(m,'uses-permission',{A+'name':'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS'}); fixtures.append(('battery_optimization_request_added',m,rules))
     for name,m,r in fixtures:
         try: validate(m,r)
         except AssertionError: print('PASS reject',name)
         else: raise AssertionError('Unsafe fixture accepted: '+name)
-    print('PASS static policy; 8 defective fixtures rejected. Cloud/D2D runtime: NOT RUN.')
+    print('PASS static policy; 10 defective fixtures rejected. Cloud/D2D runtime: NOT RUN.')
