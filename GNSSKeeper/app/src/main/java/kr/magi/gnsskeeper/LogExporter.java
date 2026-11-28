@@ -31,7 +31,8 @@ import java.util.zip.ZipOutputStream;
 /** Bounded-memory, read-only source export. All methods run on the export worker. */
 final class LogExporter {
     private static final Set<String> NAMES = new HashSet<>(Arrays.asList("observer_passive.csv", "diagnostic_gps.csv",
-            "gnss_status.csv", "gnss_measurements.csv", "events.csv", "session.json", "session.json.tmp"));
+            "gnss_status.csv", "gnss_measurements.csv", "events.csv", "session.json", "session.json.tmp",
+            "gnss_constellation.csv")); // v0.3 schema 3 summary file
     private static final Pattern SESSION = Pattern.compile("(?:PASSIVE|ACTIVE)_[0-9A-Za-z_-]+");
     private static final Pattern STATE = Pattern.compile("\"state\"\\s*:\\s*\"(CLOSED|OPEN|INCOMPLETE)\"");
     static final class Session {

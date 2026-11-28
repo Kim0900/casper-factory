@@ -132,6 +132,13 @@
             android:layout_marginTop="12dp"
             android:text="앱 권한 설정" />
 
+        <Button
+            android:id="@+id/btnBatteryOpt"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="배터리 최적화 설정(자동 복구용)" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
